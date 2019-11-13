@@ -10,6 +10,10 @@ This GAN uses a U-Net generator to take a 2D CT image with metal artifact
 streaks and tranforms it to an image with no artifacts.
 The discriminator is a CNN which attempts to distinguish between a real
 artifact-free image and the generated image.
+
+This code is based off the Pytorch-Lightning GAN template:
+https://github.com/williamFalcon/pytorch-lightning/blob/master/pl_examples/domain_templates/gan.py
+
 """
 import os
 from argparse import ArgumentParser

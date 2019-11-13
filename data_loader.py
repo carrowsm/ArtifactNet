@@ -76,17 +76,6 @@ class RadiomicsFolderBinary(data.Dataset):
                         index = index + 1
 
 
-    # def one_hot_encode(self, targets) :
-    #     '''Takes the targets as a list or 1D array and outputs the targets
-    #     as a one hot encoded 2D array. For example:
-    #     >>> X = [0, 1, 0, 0]
-    #     >>> one_hot_encode(X)
-    #         np.array([[0, 1], [1, 0], [0, 1], [0, 1]])'''
-    #     encoder = OneHotEncoder(sparse=False) # Encoder class
-    #     a = np.array(targets)                 # Convert the list to an array
-    #     int_encoded = a.reshape((len(a), 1))  # Make into a 1D column vector
-    #     return encoder.fit_transform(int_encoded)
-
 
 
     def __getitem__(self, index):

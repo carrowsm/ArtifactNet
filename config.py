@@ -9,12 +9,14 @@ log_dir = "/cluster/home/carrowsm/logs/label/"
 ### ---------------- ###
 
 parser = ArgumentParser()
-parser.add_argument("--img_dir", default=img_path, type=str)
+parser.add_argument("--latent_dim", default=None, help="Dimension of the image that \
+it given to the generator. By default, the dataloader image size will be used.")
+parser.add_argument("--img_dir", default=img_path, type=str, help="Path to the input image data.")
 parser.add_argument("--img_suffix", default=img_suffix, type=str)
-parser.add_argument("--calc_acc", action='store_true',
-                    help='Whether or not to calculate the accuracy of predictions, based on image labels.')
+
+parser.add_argument("--data_type", default="phantom", type=str,
+help="'phantom' if we are using artificial input images, 'real' if we are using patient CT scans.")
 parser.add_argument("--label_dir", default=label_path, type=str, help='Path to a CSV containing image labels.')
-parser.add_argument("--logging", action='store_true', help='Whether or not to save results.')
 parser.add_argument("--logdir", default=log_dir, type=str, help='Where to save results.')
 
 

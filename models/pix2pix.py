@@ -15,7 +15,7 @@ The generator uses a UNet architecture
 The discriminator uses
 '''
 
-class UNet(nn.Module):
+class UNet3D(nn.Module):
     ''' A 3D implementation of the UNet model.
     Paper: https://arxiv.org/pdf/1505.04597.pdf
     Code: https://pytorch.org/hub/mateuszbuda_brain-segmentation-pytorch_unet/
