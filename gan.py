@@ -30,6 +30,8 @@ from torchvision.datasets import MNIST
 
 import pytorch_lightning as pl
 
+from config import get_args
+
 
 
 
@@ -123,8 +125,11 @@ class GAN(pl.LightningModule):
 
     @pl.data_loader
     def train_dataloader(self):
+        # Load transforms
         transform = transforms.Compose([transforms.ToTensor(),
                                         transforms.Normalize([0.5], [0.5])])
+
+        # Load the dataset. This is a list of
         dataset = MNIST(os.getcwd(), train=True, download=True, transform=transform)
         return DataLoader(dataset, batch_size=self.hparams.batch_size)
 
@@ -158,16 +163,8 @@ def main(hparams):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-    parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-    parser.add_argument("--b1", type=float, default=0.5,
-                        help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--b2", type=float, default=0.999,
-                        help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--latent_dim", type=int, default=100,
-                        help="dimensionality of the latent space")
 
-    hparams = parser.parse_args()
+    # Get Hyperparameters and other arguments for training
+    hparams, unparsed_args = get_args()
 
     main(hparams)

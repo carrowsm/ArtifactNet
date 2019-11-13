@@ -12,7 +12,7 @@ from aerts.src.data.dataset.radiomics import make_dataset, load_image_meta
 
 
 class RadiomicsFolderBinary(data.Dataset):
-    """Image dataset for binary classification following Aerts et al. (2018).
+    """Image dataset for ArtifactNet artifact removal GAN.
 
        Attributes
        ----------
