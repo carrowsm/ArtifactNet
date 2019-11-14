@@ -46,6 +46,7 @@ class GAN(pl.LightningModule):
         data_shape = (1, 1, 300, 300) # Put this in a config file
         self.generator = Generator(latent_dim=hparams.latent_dim, img_shape=data_shape)
         self.discriminator = Discriminator(img_shape=data_shape)
+        self.discriminate = self.discriminator.forward
 
         # cache for generated images
         self.generated_imgs = None
@@ -79,14 +80,23 @@ class GAN(pl.LightningModule):
         return F.binary_cross_entropy(y_hat, y)
 
     def training_step(self, batch, batch_nb, optimizer_i):
-        imgs, _ = batch
+        a_img, no_a_img, _ = batch
+
+        # On first batch, plot for sanity check
+        if batch_nb == 0 :
+            fig, ax = plt.suplots(ncols=2, nrows=1)
+            ax[0].set_title("Has Artifact")
+            ax[0].imshow(a_img)
+            ax[1].set_title("No Artifact")
+            ax[1].imshow(no_a_img)
+            plt.show()
+
         self.last_imgs = imgs
 
-        # train generator
+        ### TRAIN GENERATOR ###
         if optimizer_i == 0:
-            # Get image with artifacts
-            z =
-            # z = torch.randn(imgs.shape[0], self.hparams.latent_dim)
+            # Get image and sinogram with artifacts
+            z = a_img   # has shape (batch_size, channels (2 or 4), 300, 300)
 
             # match gpu device (or keep as cpu)
             if self.on_gpu:
@@ -96,15 +106,20 @@ class GAN(pl.LightningModule):
             self.generated_imgs = self.forward(z)
 
             # log sampled images
-            # sample_imgs = self.generated_imgs[:6]
-            # grid = torchvision.utils.make_grid(sample_imgs)
-            # self.logger.experiment.add_image('generated_images', grid, 0)
+            sample_imgs = self.generated_imgs[:6]
+            grid = torchvision.utils.make_grid(sample_imgs)
+            self.logger.experiment.add_image('generated_images', grid, 0)
 
             # ground truth result (ie: all fake)
-            valid = torch.ones(imgs.size(0), 1)
+            valid = torch.ones(a_img.size(0), 1)
 
-            # adversarial loss is binary cross-entropy
-            g_loss = self.adversarial_loss(self.discriminator(self.generated_imgs), valid)
+            # Run the generated images through the discriminator to see how good they are
+            gen_preds = self.discriminate(self.generated_imgs)
+
+            # Calculate Adversarial loss using BCE loss
+            g_loss = self.adversarial_loss(gen_preds, valid)
+
+            # Save the generator loss in a dictionary
             tqdm_dict = {'g_loss': g_loss}
             output = OrderedDict({
                 'loss': g_loss,
@@ -113,20 +128,22 @@ class GAN(pl.LightningModule):
             })
             return output
 
-        # train discriminator
+        ### TRAIN DISCRIMINATOR ###
         if optimizer_i == 1:
             # Measure discriminator's ability to classify real from generated samples
 
             # how well can it label as real?
-            valid = torch.ones(imgs.size(0), 1)
-            real_loss = self.adversarial_loss(self.discriminator(imgs), valid)
+            # Give the discriminator the non-artifact imgs
+            valid = torch.ones(no_a_img.size(0), 1)
+            real_preds = self.discriminate(no_a_imgs)
+            real_loss = self.adversarial_loss(real_preds, valid)
 
             # how well can it label as fake?
-            fake = torch.zeros(imgs.size(0), 1)
-            fake_loss = self.adversarial_loss(
-                self.discriminator(self.generated_imgs.detach()), fake)
-
-            # discriminator loss is the average of these
+            fake = torch.zeros(a_imgs.size(0), 1)
+            fake_preds = self.discriminate(self.generated_imgs.detach()) # detach() detaches the
+            fake_loss = self.adversarial_loss(fake_preds, fake)          # output from the computational
+                                                                         # graph so we don't backprop
+            # discriminator loss is the average of these                 # through it.
             d_loss = (real_loss + fake_loss) / 2
             tqdm_dict = {'d_loss': d_loss}
             output = OrderedDict({
