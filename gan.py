@@ -16,8 +16,10 @@ https://github.com/williamFalcon/pytorch-lightning/blob/master/pl_examples/domai
 
 """
 import os
+import time
 from argparse import ArgumentParser
 from collections import OrderedDict
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
@@ -32,6 +34,8 @@ import pytorch_lightning as pl
 from config import get_args
 
 from data_loader import load_img_names, RadiomicsDataset
+
+from models.pix2pix import Generator, Discriminator
 
 
 
@@ -53,12 +57,12 @@ class GAN(pl.LightningModule):
         self.last_imgs = None
 
         # Get train and test data sets
-        train_files, test_files = load_img_names(self.hparams.img_dir,
+        self.train_files, self.test_files = load_img_names(self.hparams.img_dir,
                                                data_augmentation_factor=hparams.augmentation_factor)
 
 
     @pl.data_loader
-    def train_dataloader(self):
+    def tng_dataloader(self):
         # Load transforms
         # transform = transforms.Compose([transforms.ToTensor(),
         #                                 transforms.Normalize([0.5], [0.5])])
@@ -68,7 +72,7 @@ class GAN(pl.LightningModule):
                                    self.train_files,       # Ordered list of image pair file names
                                    train=True,
                                    transform=None,
-                                   test_size=0.1))
+                                   test_size=0.1)
         return DataLoader(dataset, batch_size=self.hparams.batch_size)
 
 
@@ -80,18 +84,20 @@ class GAN(pl.LightningModule):
         return F.binary_cross_entropy(y_hat, y)
 
     def training_step(self, batch, batch_nb, optimizer_i):
-        a_img, no_a_img, _ = batch
+        a_img, no_a_img = batch
 
         # On first batch, plot for sanity check
         if batch_nb == 0 :
-            fig, ax = plt.suplots(ncols=2, nrows=1)
+            print("Artifact image shape: ", np.shape(a_img), "Non- Artifact image shape: ", np.shape(no_a_img))
+            time.sleep(5)
+            fig, ax = plt.subplots(ncols=2, nrows=1)
             ax[0].set_title("Has Artifact")
-            ax[0].imshow(a_img)
+            ax[0].imshow(a_img[0, 0, :, :])
             ax[1].set_title("No Artifact")
-            ax[1].imshow(no_a_img)
+            ax[1].imshow(no_a_img[0, 0, :, :])
             plt.show()
 
-        self.last_imgs = imgs
+        self.last_imgs = [a_img, no_a_img]
 
         ### TRAIN GENERATOR ###
         if optimizer_i == 0:
@@ -168,7 +174,8 @@ class GAN(pl.LightningModule):
         z = torch.randn(8, self.hparams.latent_dim)
         # match gpu device (or keep as cpu)
         if self.on_gpu:
-            z = z.cuda(self.last_imgs.device.index)
+            last
+            z = z.cuda(self.last_imgs[].device.index)
 
         # log sampled images
         sample_imgs = self.forward(z)

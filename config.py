@@ -2,10 +2,16 @@ from argparse import ArgumentParser
 
 
 ### EDIT THESE PATHS ###
-img_path = "/cluster/projects/bhklab/RADCURE/img/"
+# Remote
+# img_path = "/cluster/projects/bhklab/RADCURE/img/"
+# img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
+# label_path = "/cluster/home/carrowsm/logs/label/reza_artifact_labels.csv"
+# log_dir = "/cluster/home/carrowsm/logs/label/"
+
+# Local
+img_path = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/trg_data"
 img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
-label_path = "/cluster/home/carrowsm/logs/label/reza_artifact_labels.csv"
-log_dir = "/cluster/home/carrowsm/logs/label/"
+log_dir = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/logs"
 ### ---------------- ###
 
 parser = ArgumentParser()
@@ -15,7 +21,6 @@ parser.add_argument("--img_suffix", default=img_suffix, type=str)
 
 parser.add_argument("--data_type", default="phantom", type=str,
 help="'phantom' if we are using artificial input images, 'real' if we are using patient CT scans.")
-parser.add_argument("--label_dir", default=label_path, type=str, help='Path to a CSV containing image labels.')
 parser.add_argument("--logdir", default=log_dir, type=str, help='Where to save results.')
 
 
@@ -29,7 +34,7 @@ parser.add_argument("--ngpu", default=None, type=int, help="Number of GPUs to us
 
 
 ### Args for model training ###
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=10, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5,
                     help="adam: decay of first order momentum of gradient")
@@ -39,7 +44,7 @@ parser.add_argument("--latent_dim", type=int, default=None,
                     help="Dimension of the image that it given to the generator. \
  By default, the dataloader image size will be used.")
 
- parser.add_argument("--augmentation_factor", type=int, default=1,
+parser.add_argument("--augmentation_factor", type=int, default=1,
                      help="Factor by which to aument the data with random transforms.")
 
 

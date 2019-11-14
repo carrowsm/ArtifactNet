@@ -181,8 +181,8 @@ class RadiomicsDataset(data.Dataset):
 
             # The Pytorch model takes a tensor of shape (batch_size, in_Channels, height, width)
             # Reshape the arrays to add another dimension
-            artifact_arr    =    artifact_arr.reshape(1, 2, height, width)
-            no_artifact_arr = no_artifact_arr.reshape(1, 2, height, width)
+            artifact_arr    =    artifact_arr.reshape(2, height, width)
+            no_artifact_arr = no_artifact_arr.reshape(2, height, width)
 
         elif z == 2 :
             # We only have the images, no sinograms
@@ -191,8 +191,8 @@ class RadiomicsDataset(data.Dataset):
 
             # The Pytorch model takes a tensor of shape (batch_size, in_Channels, height, width)
             # Reshape the arrays to add another dimension
-            artifact_arr    =    artifact_arr.reshape(1, 1, height, width)
-            no_artifact_arr = no_artifact_arr.reshape(1, 1, height, width)
+            artifact_arr    =    artifact_arr.reshape(1, height, width)
+            no_artifact_arr = no_artifact_arr.reshape(1, height, width)
 
         else :
             # The images are not paired
@@ -215,7 +215,7 @@ class RadiomicsDataset(data.Dataset):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    
+
     ### Unit testing ###
 
     # Test make_dataset
