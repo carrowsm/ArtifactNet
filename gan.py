@@ -26,11 +26,12 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
 
 import pytorch_lightning as pl
 
 from config import get_args
+
+from data_loader import load_img_names, RadiomicsDataset
 
 
 
@@ -41,14 +42,35 @@ class GAN(pl.LightningModule):
         super(GAN, self).__init__()
         self.hparams = hparams
 
-        # networks
-        mnist_shape = (1, 28, 28)
-        self.generator = Generator(latent_dim=hparams.latent_dim, img_shape=mnist_shape)
-        self.discriminator = Discriminator(img_shape=mnist_shape)
+        # Initialize networks
+        data_shape = (1, 1, 300, 300) # Put this in a config file
+        self.generator = Generator(latent_dim=hparams.latent_dim, img_shape=data_shape)
+        self.discriminator = Discriminator(img_shape=data_shape)
 
         # cache for generated images
         self.generated_imgs = None
         self.last_imgs = None
+
+        # Get train and test data sets
+        train_files, test_files = load_img_names(self.hparams.img_dir,
+                                               data_augmentation_factor=hparams.augmentation_factor)
+
+
+    @pl.data_loader
+    def train_dataloader(self):
+        # Load transforms
+        # transform = transforms.Compose([transforms.ToTensor(),
+        #                                 transforms.Normalize([0.5], [0.5])])
+
+        # Load the dataset. This is a list of file names
+        dataset = RadiomicsDataset(self.hparams.img_dir,   # Path to images
+                                   self.train_files,       # Ordered list of image pair file names
+                                   train=True,
+                                   transform=None,
+                                   test_size=0.1))
+        return DataLoader(dataset, batch_size=self.hparams.batch_size)
+
+
 
     def forward(self, z):
         return self.generator(z)
@@ -123,15 +145,7 @@ class GAN(pl.LightningModule):
         opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2))
         return [opt_g, opt_d], []
 
-    @pl.data_loader
-    def train_dataloader(self):
-        # Load transforms
-        transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize([0.5], [0.5])])
 
-        # Load the dataset. This is a list of
-        dataset = MNIST(os.getcwd(), train=True, download=True, transform=transform)
-        return DataLoader(dataset, batch_size=self.hparams.batch_size)
 
     def on_epoch_end(self):
         z = torch.randn(8, self.hparams.latent_dim)

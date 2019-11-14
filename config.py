@@ -24,7 +24,8 @@ parser.add_argument("--norm_upper", default=0.86, type=float)
 
 parser.add_argument("--test", action='store_true', help="If the test option is given, code will only process a few images.")
 
-parser.add_argument("--ncpu", default=None, type=int, help="Number of CPUs to use.")
+parser.add_argument("--ncpu", default=1, type=int, help="Number of CPUs to use.")
+parser.add_argument("--ngpu", default=None, type=int, help="Number of GPUs to use.")
 
 
 ### Args for model training ###
@@ -35,8 +36,11 @@ parser.add_argument("--b1", type=float, default=0.5,
 parser.add_argument("--b2", type=float, default=0.999,
                     help="adam: decay of first order momentum of gradient")
 parser.add_argument("--latent_dim", type=int, default=None,
-                    help="Dimension of the image that it given to the generator.\
+                    help="Dimension of the image that it given to the generator. \
  By default, the dataloader image size will be used.")
+
+ parser.add_argument("--augmentation_factor", type=int, default=1,
+                     help="Factor by which to aument the data with random transforms.")
 
 
 # Helper function to get arguments in other scripts
