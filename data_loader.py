@@ -6,51 +6,49 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from aerts.src.settings import DATA_PATH_CLINICAL_PROCESSED, RANDOM_SEED, DATA_PATH_IMAGE_SIZE, IMAGE_ROTATIONS, IMAGE_AUGMENTATION_FACTOR
-from aerts.src.data.dataset.radiomics import make_dataset, load_image_meta
 
 
 
-class RadiomicsFolderBinary(data.Dataset):
+class RadiomicsFolder(data.Dataset):
     """Image dataset for ArtifactNet artifact removal GAN.
 
        Attributes
-       ----------
-       root : str
-           Path to directory containing the images.
-       extensions : list of str
-           A list of allowed file extensions.
+       ---------
        train : bool
           Whether to return the training set or test set.
-       transform : callable, optional
-          Transformation that will be applied to the images on loading.
-       test_size : float or int
-          Number of samples in the test set (if int) or the proportion of
-          samples to include in the test set (if float between 0. and 1.).
+       dataset_length: int
+          Number of images in the data set
+       normalize: callable
+          perform linear normalization on the data
+
     """
 
     def __init__(self,
-                 image_paths, # Ordered list of paths to images (len(image_paths) = number of patients*aug_factor)
-                 targets,     # Ordered list of targets (HPV statuses)
+                 image_root_dir,        # Path to images
+                 image_names,           # Ordered list of image pair file names
                  train=True,
                  transform=None,
-                 test_size=.3,
-                 aug_factor=IMAGE_AUGMENTATION_FACTOR):
+                 test_size=.3):
 
-        self.image_paths = image_paths # List of npz file names
-        self.image_dir_paths = os.path.dirname(image_paths[0])
-        self.targets = targets
-        # self.image_meta_data = load_image_meta(DATA_PATH_IMAGE_SIZE)
 
+        self.root_dir = image_root_dir
+        self.image_names = image_names # List of npy file names
+        '''image_names should be an ordere list of npy file names with the
+        following format:
+            path_to_images/i.npy
+        where :
+            i is the patient index, corresponding to a file named "i.npy".
+            .npy is the file extension.
+        '''
+
+        # Transform to be applied to the image
         self.transform = transform
 
         self.train = train
         self.test_size = test_size
-        self.image_rotations = IMAGE_ROTATIONS
-        self.aug_factor = aug_factor
 
-        self.dir_size = len(self.image_paths) / self.aug_factor   # Number of npz files in image_paths
-        self.dataset_length = len(self.image_paths)               # Total number of 3D images
+
+        self.dataset_length = len(self.image_paths)   # Total number of image pairs (including augmentations)
 
 
     def normalize(self, img, MIN:float, MAX:float) :
@@ -61,66 +59,69 @@ class RadiomicsFolderBinary(data.Dataset):
         img /= img.std()
         return img
 
-
-    def get_rotation(self, image_aug_index) :
-        '''Takes the index of the image within the npz file and finds
-           key in the dictionary for the rotation it corresponds to.'''
-        index = 0
-        for i in range(self.image_rotations['x']) :                       # This function mimmics _get_rotations() in
-            for j in range(self.image_rotations['y']) :                   # aerts.src.data.preprocess.structures
-                for k in range(self.image_rotations['z']) :               # since this is how the rotations are defined.
-                    if index == image_aug_index :                         #
-                        name = "{:03}_{:03}_{:03}".format(i*90, j*90, k*90)
-                        return name
-                    else:
-                        index = index + 1
-
-
+    def transform(X) :
+        """When we start using data augmentation we will call transform to
+        apply random rotations, translations etc to the data"""
+        return X
 
 
     def __getitem__(self, index):
-        '''This function gets called by the trainer and passes one input image to the model.
-           Given the index of that specific image in the dataset, this function returns the pytorch
-           tensor representing the image to train the model, as well as the correstponding label
-           (HPV status) for that image.
+        '''This function gets called by the trainer and passes four input images to the model.
+           Given the index of that patient in the dataset, this function returns the pytorch
+           tensor representing the image with artifacts, the image without artifacts, the
+           sinogram with artifacts, and the sinogram without artifacts.
            --------------
            The image_path initiated by this class takes the form:
-               /path/to/image/patientID.npz_augmentationindex
+               /path/to/image/img_number.npz
            where:
-               - /path/to/image/patientID.npz is the path and filename of the npz file represented as a string.
-               - augmentationindex is a single number between 0 and aug_factor which represented the index of the
-                 augmented image within the patient's image dictionary. This is interpreted by self.get_rotations().
+               - /path/to/image/img_number.npz is the path and filename of the npz file represented as a string.
+
            --------------
            The output of this function must be of the form:
-               (image_tensor, target)
+               (image_tensor, sinogram_tensor)
            where:
-               - image_tensor is a pytorch tensor with shape: (batch_size, input_channels, depth, height, width)
-               - target is a scalar representing the HPV status of that image
+               - artifact_tensor is a pytorch tensor with shape: (2, height, width).
+               - no_artifact_tensor is a pytorch tensor with shape: (2, height, width).
+               - The first dimension (with size two) is for the models two input channels (image and sinogram)
+               The stacking order is:
+                    artifact_tensor[0, : , :] = image_with_artifact
+                    artifact_tensor[1, : , :] = sinogram_with_artifact
+               and
+                    no_artifact_tensor[0, : , :] = image_without_artifact
+                    no_artifact_tensor[1, : , :] = sinogram_without_artifact
            --------------
         '''
 
-        image_file, image_aug_index = self.image_paths[index].split("_")   # Location of the npz file in the directory
+        image_file_name = self.image_names[i]
+        image_path = os.path.join(self.root_dir, image_file_name)
 
 
         # Each file in image_paths is a compressed collection of one patient's augmented images
-        image_dict = np.load(image_file)                             # Dictionary of augmented 3D imgs for 1 patient
-        image_key = self.get_rotation(int(image_aug_index))          # A key for the image rotation that our index corresponds to
-        image = image_dict[image_key]                                # 3D array representing the specific image in question
-        image = self.normalize(image, 0.64, 0.86)                      # Normalize the image
+        image_stack = np.load(image_path)                     # 3D image with shape (4, height, width)
 
-        # The image has to be wrapped in an array to give it an extra dimension of size 1 (representing 1 input channel).
-        # This is because the conv3d functions in the model expect a 5D input vector.
-        image_tensor = torch.from_numpy( np.array([image]) ).float()
+        # Perfom transformation and normalization
+        # image_stack = transform(image_stack)
+        # image = self.normalize(image, 0.64, 0.86)             # Normalize the image
 
-        target = self.targets[index]  # For this to work, targets must be an ordered list of patient
-                                      # outcomes (survival, HPV, whatever) with same length as
-                                      # number of patients * aug_factor.
+        # Seperate the 3D image into two np arrays representing 4 images.
+        artifact_arr     = image_stack[0:2, :, :]   # 3D image with shape (4, height, width)
+        no_artifact_arr  = image_stack[2: , :, :]   # 3D image with shape (4, height, width)
 
-        # Convert the targets to a binary one-hot-encoded array
-        # target = self.one_hot_encode(target)
 
-        return np.array([image]), target   # The image has to be wrapped in an array to give it an extra dimension of size 1
-                                           # This is because the conv3d functions in the model expect a 5D input vector.
+
+        # The Pytorch model takes a tensor of shape (batch_size, in_Channels, height, width)
+        # Reshape the arrays to add another dimension
+        height, width   = np.shape(artifact_arr[0])
+        artifact_arr    =    artifact_arr.reshape(1, 2, height, width)
+        no_artifact_arr = no_artifact_arr.reshape(1, 2, height, width)
+
+        # Convert the np.arrays to PyTorch tensors
+        artifact_tensor    = torch.from_numpy( artifact_arr).float()
+        no_artifact_tensor = torch.from_numpy( no_artifact_arr).float()
+
+
+
+        return artifact_tensor, no_artifact_tensor
 
     def __len__(self):
         return self.dataset_length

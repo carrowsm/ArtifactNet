@@ -9,8 +9,7 @@ log_dir = "/cluster/home/carrowsm/logs/label/"
 ### ---------------- ###
 
 parser = ArgumentParser()
-parser.add_argument("--latent_dim", default=None, help="Dimension of the image that \
-it given to the generator. By default, the dataloader image size will be used.")
+
 parser.add_argument("--img_dir", default=img_path, type=str, help="Path to the input image data.")
 parser.add_argument("--img_suffix", default=img_suffix, type=str)
 
@@ -35,8 +34,9 @@ parser.add_argument("--b1", type=float, default=0.5,
                     help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999,
                     help="adam: decay of first order momentum of gradient")
-parser.add_argument("--latent_dim", type=int, default=100,
-                    help="dimensionality of the latent space")
+parser.add_argument("--latent_dim", type=int, default=None,
+                    help="Dimension of the image that it given to the generator.\
+ By default, the dataloader image size will be used.")
 
 
 # Helper function to get arguments in other scripts
