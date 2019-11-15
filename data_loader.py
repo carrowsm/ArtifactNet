@@ -238,12 +238,12 @@ if __name__ == '__main__':
 
     plt.figure()
     plt.title("Has Artifact")
-    plt.imshow(art_image[0, 0, :, :])
+    plt.imshow(art_image[ 0, :, :])
     plt.colorbar()
     plt.show()
 
     plt.figure()
     plt.title("No Artifact")
-    plt.imshow(nonart_img[0, 0, :, :])
+    plt.imshow(nonart_img[ 0, :, :])
     plt.colorbar()
     plt.show()

@@ -26,6 +26,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+from torch.utils.tensorboard import SummaryWriter
+
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
@@ -35,7 +37,7 @@ from config import get_args
 
 from data_loader import load_img_names, RadiomicsDataset
 
-from models.pix2pix import Generator, Discriminator
+from models.pix2pix_homemade import Generator, Discriminator
 
 
 
@@ -45,6 +47,9 @@ class GAN(pl.LightningModule):
     def __init__(self, hparams):
         super(GAN, self).__init__()
         self.hparams = hparams
+
+        # Writer will output to ./runs/ directory by default
+        self.logger = SummaryWriter()
 
         # Initialize networks
         data_shape = (1, 1, 300, 300) # Put this in a config file
@@ -87,15 +92,15 @@ class GAN(pl.LightningModule):
         a_img, no_a_img = batch
 
         # On first batch, plot for sanity check
-        if batch_nb == 0 :
-            print("Artifact image shape: ", np.shape(a_img), "Non- Artifact image shape: ", np.shape(no_a_img))
-            time.sleep(5)
-            fig, ax = plt.subplots(ncols=2, nrows=1)
-            ax[0].set_title("Has Artifact")
-            ax[0].imshow(a_img[0, 0, :, :])
-            ax[1].set_title("No Artifact")
-            ax[1].imshow(no_a_img[0, 0, :, :])
-            plt.show()
+        # if batch_nb == 0 :
+            # print("Artifact image shape: ", np.shape(a_img), "Non- Artifact image shape: ", np.shape(no_a_img))
+            # time.sleep(5)
+            # fig, ax = plt.subplots(ncols=2, nrows=1)
+            # ax[0].set_title("Has Artifact")
+            # ax[0].imshow(a_img[0, 0, :, :])
+            # ax[1].set_title("No Artifact")
+            # ax[1].imshow(no_a_img[0, 0, :, :])
+            # plt.show()
 
         self.last_imgs = [a_img, no_a_img]
 
@@ -106,7 +111,7 @@ class GAN(pl.LightningModule):
 
             # match gpu device (or keep as cpu)
             if self.on_gpu:
-                z = z.cuda(imgs.device.index)
+                z = z.cuda(a_img.device.index)
 
             # generate images
             self.generated_imgs = self.forward(z)
@@ -114,7 +119,7 @@ class GAN(pl.LightningModule):
             # log sampled images
             sample_imgs = self.generated_imgs[:6]
             grid = torchvision.utils.make_grid(sample_imgs)
-            self.logger.experiment.add_image('generated_images', grid, 0)
+            self.logger.add_image('generated_images', grid, 0)
 
             # ground truth result (ie: all fake)
             valid = torch.ones(a_img.size(0), 1)
@@ -127,11 +132,10 @@ class GAN(pl.LightningModule):
 
             # Save the generator loss in a dictionary
             tqdm_dict = {'g_loss': g_loss}
-            output = OrderedDict({
-                'loss': g_loss,
-                'progress_bar': tqdm_dict,
-                'log': tqdm_dict
-            })
+            output = OrderedDict({'loss': g_loss,
+                                  'progress_bar': tqdm_dict,
+                                  'log': tqdm_dict
+                                  })
             return output
 
         ### TRAIN DISCRIMINATOR ###
@@ -141,11 +145,11 @@ class GAN(pl.LightningModule):
             # how well can it label as real?
             # Give the discriminator the non-artifact imgs
             valid = torch.ones(no_a_img.size(0), 1)
-            real_preds = self.discriminate(no_a_imgs)
+            real_preds = self.discriminate(no_a_img)
             real_loss = self.adversarial_loss(real_preds, valid)
 
             # how well can it label as fake?
-            fake = torch.zeros(a_imgs.size(0), 1)
+            fake = torch.zeros(a_img.size(0), 1)
             fake_preds = self.discriminate(self.generated_imgs.detach()) # detach() detaches the
             fake_loss = self.adversarial_loss(fake_preds, fake)          # output from the computational
                                                                          # graph so we don't backprop
@@ -158,6 +162,8 @@ class GAN(pl.LightningModule):
                 'log': tqdm_dict
             })
             return output
+
+
 
     def configure_optimizers(self):
         lr = self.hparams.lr
@@ -174,13 +180,12 @@ class GAN(pl.LightningModule):
         z = torch.randn(8, self.hparams.latent_dim)
         # match gpu device (or keep as cpu)
         if self.on_gpu:
-            last
-            z = z.cuda(self.last_imgs[].device.index)
+            z = z.cuda(self.last_imgs.device.index)
 
         # log sampled images
         sample_imgs = self.forward(z)
         grid = torchvision.utils.make_grid(sample_imgs)
-        self.logger.experiment.add_image(f'generated_images', grid, self.current_epoch)
+        self.logger.add_image('generated_images', grid, self.current_epoch)
 
 
 def main(hparams):
@@ -204,5 +209,7 @@ if __name__ == '__main__':
 
     # Get Hyperparameters and other arguments for training
     hparams, unparsed_args = get_args()
+
+
 
     main(hparams)
