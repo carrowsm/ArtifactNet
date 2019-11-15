@@ -91,16 +91,6 @@ class GAN(pl.LightningModule):
     def training_step(self, batch, batch_nb, optimizer_i):
         a_img, no_a_img = batch
 
-        # On first batch, plot for sanity check
-        # if batch_nb == 0 :
-            # print("Artifact image shape: ", np.shape(a_img), "Non- Artifact image shape: ", np.shape(no_a_img))
-            # time.sleep(5)
-            # fig, ax = plt.subplots(ncols=2, nrows=1)
-            # ax[0].set_title("Has Artifact")
-            # ax[0].imshow(a_img[0, 0, :, :])
-            # ax[1].set_title("No Artifact")
-            # ax[1].imshow(no_a_img[0, 0, :, :])
-            # plt.show()
 
         self.last_imgs = [a_img, no_a_img]
 
@@ -115,6 +105,7 @@ class GAN(pl.LightningModule):
 
             # generate images
             self.generated_imgs = self.forward(z)
+            self.last_imgs = self.generated_imgs
 
             # log sampled images
             sample_imgs = self.generated_imgs[:6]
@@ -136,6 +127,7 @@ class GAN(pl.LightningModule):
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
+
             return output
 
         ### TRAIN DISCRIMINATOR ###
@@ -177,15 +169,17 @@ class GAN(pl.LightningModule):
 
 
     def on_epoch_end(self):
-        z = torch.randn(8, self.hparams.latent_dim)
         # match gpu device (or keep as cpu)
+        z = self.last_imgs
         if self.on_gpu:
             z = z.cuda(self.last_imgs.device.index)
 
-        # log sampled images
-        sample_imgs = self.forward(z)
-        grid = torchvision.utils.make_grid(sample_imgs)
-        self.logger.add_image('generated_images', grid, self.current_epoch)
+        # log sampled images (with most recent batch img)
+        sample_imgs = self.forward(z[0:7, :, :])
+        gen_grid = torchvision.utils.make_grid(sample_imgs)
+        ori_grid = torchvision.utils.make_grid(a_img[0:7, :, :])
+        self.logger.add_image('Original_Artifact_images', ori_grid, self.current_epoch)
+        self.logger.add_image('generated_images', gen_grid, self.current_epoch)
 
 
 def main(hparams):
