@@ -3,15 +3,14 @@ from argparse import ArgumentParser
 
 ### EDIT THESE PATHS ###
 # Remote
-# img_path = "/cluster/projects/bhklab/RADCURE/img/"
-# img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
-# label_path = "/cluster/home/carrowsm/logs/label/reza_artifact_labels.csv"
-# log_dir = "/cluster/home/carrowsm/logs/label/"
+img_path = "/cluster/projects/bhklab/RADCURE/img/"
+img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
+log_dir = "/cluster/home/carrowsm/logs/artifact_net/"
 
 # Local
-img_path = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/trg_data"
-img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
-log_dir = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/logs"
+# img_path = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/trg_data"
+# img_suffix = "_img.npy"                 # This string follows the patient ID in the filename
+# log_dir = "/home/colin/Documents/BHKLab/data/Artifact_Net_Training/logs"
 ### ---------------- ###
 
 parser = ArgumentParser()

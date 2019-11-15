@@ -49,7 +49,7 @@ class GAN(pl.LightningModule):
         self.hparams = hparams
 
         # Writer will output to ./runs/ directory by default
-        self.logger = SummaryWriter()
+        self.logger = SummaryWriter(hparams.logdir)
 
         # Initialize networks
         data_shape = (1, 1, 300, 300) # Put this in a config file
