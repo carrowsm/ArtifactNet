@@ -63,11 +63,12 @@ class GAN(pl.LightningModule):
 
         # Get train and test data sets
         self.train_files, self.test_files = load_img_names(self.hparams.img_dir,
-                                               data_augmentation_factor=hparams.augmentation_factor)
+                                               data_augmentation_factor=hparams.augmentation_factor,
+                                               test_size=0.1)
 
 
     @pl.data_loader
-    def tng_dataloader(self):
+    def train_dataloader(self):
         # Load transforms
         # transform = transforms.Compose([transforms.ToTensor(),
         #                                 transforms.Normalize([0.5], [0.5])])
@@ -105,12 +106,12 @@ class GAN(pl.LightningModule):
 
             # generate images
             self.generated_imgs = self.forward(z)
-            self.last_imgs = self.generated_imgs
 
             # log sampled images
-            sample_imgs = self.generated_imgs[:6]
+            # sample_imgs = self.generated_imgs[:6]
+            sample_imgs = [z[0], self.generated_imgs[0]]
             grid = torchvision.utils.make_grid(sample_imgs)
-            self.logger.add_image('generated_images', grid, 0)
+            self.logger.add_image(f'imgs/epoch{self.current_epoch}/batch_sample', grid, batch_nb)
 
             # ground truth result (ie: all fake)
             valid = torch.ones(a_img.size(0), 1)
@@ -169,17 +170,22 @@ class GAN(pl.LightningModule):
 
 
     def on_epoch_end(self):
+        a_img, no_a_img = self.last_imgs[0], self.last_imgs[1]
+
         # match gpu device (or keep as cpu)
-        z = self.last_imgs
+        z = a_img
         if self.on_gpu:
-            z = z.cuda(self.last_imgs.device.index)
+            z = z.cuda(a_img.device.index)
 
         # log sampled images (with most recent batch img)
-        sample_imgs = self.forward(z[0:7, :, :])
-        gen_grid = torchvision.utils.make_grid(sample_imgs)
-        ori_grid = torchvision.utils.make_grid(a_img[0:7, :, :])
-        self.logger.add_image('Original_Artifact_images', ori_grid, self.current_epoch)
-        self.logger.add_image('generated_images', gen_grid, self.current_epoch)
+        gen_imgs = self.forward(z)
+        grid1 = torchvision.utils.make_grid(a_img[0:7])
+        grid2 = torchvision.utils.make_grid(no_a_img[0:7])
+        grid3 = torchvision.utils.make_grid(gen_imgs[0:7])
+        self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_orig_w_artifact', grid1, 0)
+        self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_orig_n_artifact', grid2, 0)
+        self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_generated', grid3, 0)
+
 
 
 def main(hparams):
@@ -191,7 +197,8 @@ def main(hparams):
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    trainer = pl.Trainer()
+    # trainer = pl.Trainer(max_nb_epochs=10, gpus=hparams.ngpu, distributed_backend='ddp')
+    trainer = pl.Trainer(max_nb_epochs=10)
 
     # ------------------------
     # 3 START TRAINING
