@@ -1,0 +1,5 @@
+setup.py
+ArtifactNet.egg-info/PKG-INFO
+ArtifactNet.egg-info/SOURCES.txt
+ArtifactNet.egg-info/dependency_links.txt
+ArtifactNet.egg-info/top_level.txt
