@@ -1,2 +1,4 @@
 slurm*
+*.out
 ArtifactNet.egg-info/*
+calc_specs.py

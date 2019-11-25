@@ -197,6 +197,8 @@ class RadiomicsDataset(data.Dataset):
             X[i, :, :] = rotate(X[i, :, :], angle)
 
         X = self.lin_norm(X)
+        transform = transforms.Compose([transforms.ToTensor(),
+                                        transforms.Normalize([0.5], [0.5])])
         return X
 
     def parse_phantom(self, img_data) :
