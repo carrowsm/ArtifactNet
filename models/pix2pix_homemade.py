@@ -6,48 +6,21 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-# conv = nn.Conv2d(
-#     in_channels=1,
-#     out_channels=32,
-#     kernel_size=3,
-#     padding=1,
-#     bias=False)
-# tensor = torch.randn((10, 1, 300, 300))
-# np.shape(tensor)
-#
-# np.shape(conv(tensor))
-#
-# def get_pool_dims(Hin, Win, stride, kernel_size, padding=0, dilation=1):
-#     # Wout = ( Hin+(2*padding) -dilation*(kernel_size-1) - 1)/stride  + 1
-#     # return Wout, Wout
-#     x = torch.randn(1, 1, Hin, Win)
-#     pool = nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation)
-#     return np.shape(pool(x))
-#
-# def get_upconvdims(Hin, Win, stride, kernel_size, padding=0, dilation=1):
-#     c = nn.ConvTranspose2d(1, 1, kernel_size=kernel_size, stride=stride)
-#     x = torch.randn(1, 1, Hin, Win)
-#     return np.shape(c(x))
-#
-# get_upconvdims(150, 150, kernel_size=2, stride=2)
-# get_pool_dims(38, 38, kernel_size=2, stride=2, padding=0)
-#
-# x = torch.randn(1,1,38, 38)
-# y = torch.randn(1,1,38, 38)
-# np.shape(torch.cat((x, y), dim=1))
-
 
 
 
 class UNet2D(nn.Module):
 
-    def __init__(self, in_channels=2, out_channels=1, init_features=32):
+    def __init__(self, in_channels=1, out_channels=1, init_features=64):
         super(UNet2D, self).__init__()
 
         features = init_features
         ### ENCODER ###
-        """ We use three blocks of convolutions, each followed by max pooling
-        to reduce the dimensionality"""
+        """
+            Use the original U-Net architecture from the original paper:
+            https://arxiv.org/abs/1505.04597
+            GitHub: https://github.com/milesial/Pytorch-UNet
+        """
         self.features = init_features
         self.encoder1 = self.conv_relu(in_channels, features, name="enc1")
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -56,7 +29,7 @@ class UNet2D(nn.Module):
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.encoder3 = self.conv_relu(features * 2, features * 4, name="enc3")
-        self.pool3 = nn.MaxPool2d(kernel_size=1, stride=2)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.encoder4 = self.conv_relu(features * 4, features * 8, name="enc4")
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -81,29 +54,29 @@ class UNet2D(nn.Module):
         ### ------- ###
 
     def forward(self, x):
-        enc1 = self.encoder1(x)                            # (N, 32, 300, 300)
-        enc2 = self.encoder2(self.pool1(enc1))             # (N, 64, 150, 150)
-        enc3 = self.encoder3(self.pool2(enc2))             # (N, 128, 75, 75)
-        enc4 = self.encoder4(self.pool3(enc3))             # (N, 256, 38, 38)
+        enc1 = self.encoder1(x)                            # (N, 64, 300, 300)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 150, 150)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 75, 75)
+        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 38, 38)
 
-        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 512, 19, 19)
+        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 19, 19)
 
-        dec4 = self.upconv4(bottleneck)                    # (N, 256, 38, 38)
-        dec4 = torch.cat((dec4, enc4), dim=1)              # (N, 512, 38, 38)
-        dec4 = self.decoder4(dec4)                         # (N, 256, 38, 38)
-        dec3 = self.upconv3(dec4)                          # (N, 128, 75, 75)
-        dec3 = torch.cat((dec3, enc3), dim=1)              # (N, 256, 75, 75)
-        dec3 = self.decoder3(dec3)                         # (N, 128, 75, 75)
-        dec2 = self.upconv2(dec3)                          # (N, 64, 150, 150)
-        dec2 = torch.cat((dec2, enc2), dim=1)              # (N, 128, 150, 150)
-        dec2 = self.decoder2(dec2)                         # (N, 64, 150, 150)
-        dec1 = self.upconv1(dec2)                          # (N, 32, 300, 300)
-        dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 64, 300, 300)
-        dec1 = self.decoder1(dec1)                         # (N, 32, 300, 300)
+        dec4 = self.upconv4(bottleneck)                    # (N, 512, 38, 38)
+        dec4 = torch.cat((dec4, enc4), dim=1)              # (N, 1024, 38, 38)
+        dec4 = self.decoder4(dec4)                         # (N, 512, 38, 38)
+        dec3 = self.upconv3(dec4)                          # (N, 256, 75, 75)
+        dec3 = torch.cat((dec3, enc3), dim=1)              # (N, 512, 75, 75)
+        dec3 = self.decoder3(dec3)                         # (N, 256, 75, 75)
+        dec2 = self.upconv2(dec3)                          # (N, 128, 150, 150)
+        dec2 = torch.cat((dec2, enc2), dim=1)              # (N, 256, 150, 150)
+        dec2 = self.decoder2(dec2)                         # (N, 128, 150, 150)
+        dec1 = self.upconv1(dec2)                          # (N, 64, 300, 300)
+        dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 300, 300)
+        dec1 = self.decoder1(dec1)                         # (N, 64, 300, 300)
         return torch.sigmoid(self.conv(dec1))              # (N, 1, 300, 300)
 
     @staticmethod
-    def conv_relu(in_channels, features, name):
+    def conv_relu(in_channels, features, name=None):
         '''Perform:
         1. 2d convolution, kernel=3, padding=1, so output_size=input_size
         2. Batch normalization
@@ -157,20 +130,42 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, img_shape):
+    def __init__(self, output_dim):
         super(Discriminator, self).__init__()
 
-        self.model = nn.Sequential(
-            nn.Linear(int(np.prod(img_shape)), 512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 1),
-            nn.Sigmoid(),
-        )
+        """ Use architecture from Mattea's DA detection paper"""
 
-    def forward(self, img):
-        img_flat = img.view(img.size(0), -1)
-        validity = self.model(img_flat)
+        self.pool = nn.MaxPool3d(2, 2)
+        self.LRelu = nn.LeakyReLU(0.01)
+
+        self.conv1 = nn.Conv2d(1, 4, 5, padding=2)
+        self.conv1_bn = nn.BatchNorm3d(4)
+
+        self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
+        self.conv2_bn = nn.BatchNorm3d(8)
+
+        self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
+        self.conv3_bn = nn.BatchNorm3d(16)
+
+        self.conv4 = nn.Conv2d(16, 32, 3, padding=1)
+        self.conv4_bn = nn.BatchNorm3d(32)
+
+        self.conv5 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv5_bn = nn.BatchNorm3d(64)
+
+        self.avgPool = nn.AvgPool3d(2, 2)
+
+        self.fc3 = nn.Linear(64 * 8 * 8 * 8, output_dim)
+
+
+    def forward(self, X):
+        X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
+        X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
+        X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
+        X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
+        X = self.conv5_bn(self.LRelu(self.conv5(X)))
+        X = self.avgPool(X)
+        X = X.view(-1, 64 * 8 * 8 * 8)
+        validity = self.fc3(X)
 
         return validity
