@@ -3,3 +3,4 @@ slurm*
 ArtifactNet.egg-info/*
 calc_specs.py
 *.csv
+notebooks/.ipynb_checkpoints/*
