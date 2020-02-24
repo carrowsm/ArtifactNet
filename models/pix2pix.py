@@ -1,0 +1,181 @@
+import os
+from argparse import ArgumentParser
+from collections import OrderedDict
+
+import numpy as np
+import torch
+import torch.nn as nn
+
+
+
+class UNet2D(nn.Module):
+
+    def __init__(self, in_channels=1, out_channels=1, init_features=64):
+        super(UNet2D, self).__init__()
+
+        features = init_features
+        ### ENCODER ###
+        """
+            Use the original U-Net architecture from the original paper:
+            https://arxiv.org/abs/1505.04597
+            GitHub: https://github.com/milesial/Pytorch-UNet
+        """
+
+        self.features = init_features
+        self.encoder1 = self.conv_relu(in_channels, features, name="enc1")
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.encoder2 = self.conv_relu(features, features * 2, name="enc2")
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.encoder3 = self.conv_relu(features * 2, features * 4, name="enc3")
+        self.pool3 = nn.MaxPool2d(kernel_size=1, stride=2)
+
+        self.encoder4 = self.conv_relu(features * 4, features * 8, name="enc4")
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
+        ### ------- ###
+
+        self.bottleneck = self.conv_relu(features * 8, features * 16, name="bottleneck")
+
+        ### DECODER ###
+        self.upconv4 = nn.ConvTranspose2d(features * 16, features * 8, kernel_size=2, stride=2)
+        self.decoder4 = self.conv_relu((features * 8) * 2, features * 8, name="dec4")
+
+        self.upconv3 = nn.ConvTranspose2d(features * 8, features * 4, kernel_size=1, stride=2)
+        self.decoder3 = self.conv_relu((features * 4) * 2, features * 4, name="dec3")
+
+        self.upconv2 = nn.ConvTranspose2d(features * 4, features * 2, kernel_size=2, stride=2)
+        self.decoder2 = self.conv_relu((features * 2) * 2, features * 2, name="dec2")
+
+        self.upconv1 = nn.ConvTranspose2d(features * 2, features, kernel_size=2, stride=2)
+        self.decoder1 = self.conv_relu(features * 2, features, name="dec1")
+
+        self.conv = nn.Conv2d(in_channels=features, out_channels=out_channels, kernel_size=1)
+        ### ------- ###
+
+    def forward(self, x):
+        enc1 = self.encoder1(x)                            # (N, 64, 300, 300)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 150, 150)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 75, 75)
+        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 38, 38)
+
+        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 19, 19)
+
+        dec4 = self.upconv4(bottleneck)                    # (N, 512, 38, 38)
+        dec4 = torch.cat((dec4, enc4), dim=1)              # (N, 1024, 38, 38)
+        dec4 = self.decoder4(dec4)                         # (N, 512, 38, 38)
+        dec3 = self.upconv3(dec4)                          # (N, 256, 75, 75)
+        dec3 = torch.cat((dec3, enc3), dim=1)              # (N, 512, 75, 75)
+        dec3 = self.decoder3(dec3)                         # (N, 256, 75, 75)
+        dec2 = self.upconv2(dec3)                          # (N, 128, 150, 150)
+        dec2 = torch.cat((dec2, enc2), dim=1)              # (N, 256, 150, 150)
+        dec2 = self.decoder2(dec2)                         # (N, 128, 150, 150)
+        dec1 = self.upconv1(dec2)                          # (N, 64, 300, 300)
+        dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 300, 300)
+        dec1 = self.decoder1(dec1)                         # (N, 64, 300, 300)
+        return torch.sigmoid(self.conv(dec1))              # (N, 1, 300, 300)
+
+    @staticmethod
+    def conv_relu(in_channels, features, name):
+        '''Perform:
+        1. 2d convolution, kernel=3, padding=1, so output_size=input_size
+        2. Batch normalization
+        3. Relu
+        4. Another convolution, with same input and output size
+        5. batch normalization
+        6. Relu'''
+        return nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        name + "conv1",
+                        nn.Conv2d(
+                            in_channels=in_channels,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                    ),
+                    (name + "norm1", nn.BatchNorm2d(num_features=features)),
+                    (name + "relu1", nn.ReLU(inplace=True)),
+                    (
+                        name + "conv2",
+                        nn.Conv2d(
+                            in_channels=features,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                    ),
+                    (name + "norm2", nn.BatchNorm2d(num_features=features)),
+                    (name + "relu2", nn.ReLU(inplace=True)),
+                ]
+            )
+        )
+
+
+class Generator(nn.Module):
+    def __init__(self, latent_dim, img_shape):
+        super(Generator, self).__init__()
+        self.img_shape = img_shape
+
+        # Initialize UNet2D with 2 input channels for CT and sinogram domain
+        self.network = UNet2D(in_channels=1, out_channels=1, init_features=64)
+
+    def forward(self, z):
+        img = self.network.forward(z)
+        return img
+
+
+class Discriminator(nn.Module):
+    def __init__(self, output_dim=1):
+        super(Discriminator, self).__init__()
+
+        """ Use architecture from Mattea's DA detection paper """
+        # PyTorch's conv2d takes the following form:
+        # initialization:   (channels_in, channels_out, kernel_size)
+        # Input :           (batch_size, Channels_in, H, W)
+
+        self.pool = nn.MaxPool2d(2, 2) # (kernel_size, stride)
+        self.LRelu = nn.LeakyReLU(0.01)
+
+        self.conv1 = nn.Conv2d(1, 4, 5, padding=2)
+        self.conv1_bn = nn.BatchNorm2d(4)
+
+        self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
+        self.conv2_bn = nn.BatchNorm2d(8)
+
+        self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
+        self.conv3_bn = nn.BatchNorm2d(16)
+
+        self.conv4 = nn.Conv2d(16, 32, 3, padding=1)
+        self.conv4_bn = nn.BatchNorm2d(32)
+
+        self.conv5 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv5_bn = nn.BatchNorm2d(64)
+
+        self.avgPool = nn.AvgPool2d(2, 2)
+
+        self.fc3 = nn.Linear(64 * 9 * 9, output_dim)
+
+        self.softmax = torch.nn.Softmax(dim=1)
+
+
+    def forward(self, X):
+        X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
+        X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
+        X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
+        X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
+        X = self.conv5_bn(self.LRelu(self.conv5(X)))
+        X = self.avgPool(X)
+
+        # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
+        X = X.view(-1, 64 * 9 * 9)
+        validity = self.fc3(X)
+
+        # Constrain output of model to (0, 1)
+        validity = self.softmax(validity)
+
+        return validity
