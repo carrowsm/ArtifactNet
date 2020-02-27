@@ -14,6 +14,11 @@ artifact-free image and the generated image.
 This code is based off the Pytorch-Lightning GAN template:
 https://github.com/williamFalcon/pytorch-lightning/blob/master/pl_examples/domain_templates/gan.py
 
+This script trains on paired 2D images of DA+ and DA- shepps-logan
+CT phantoms.
+
+To run the script, just login to H4H and run:
+$ sbatch /cluster/home/carrowsm/config/artifact_net/remove_artifacts.sh
 """
 import os
 import time
@@ -26,7 +31,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from torch.utils.tensorboard import SummaryWriter
+
+from pytorch_lightning.loggers import TensorBoardLogger
 
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
@@ -39,7 +45,6 @@ from data_loader import load_img_names, RadiomicsDataset
 
 from models.pix2pix import Generator, Discriminator
 
-from test_tube import Experiment
 
 
 
@@ -49,9 +54,6 @@ class GAN(pl.LightningModule):
     def __init__(self, hparams):
         super(GAN, self).__init__()
         self.hparams = hparams
-
-        # Writer will output to ./runs/ directory by default
-        self.logger = SummaryWriter(hparams.logdir)
 
         # Initialize networks
         data_shape = (1, 1, 300, 300) # Put this in a config file
@@ -67,12 +69,15 @@ class GAN(pl.LightningModule):
                                                data_augmentation_factor=hparams.augmentation_factor,
                                                test_size=0.1)
 
+        self.criterion = nn.BCELoss()
+        self.l1 = nn.L1Loss(reduction="mean")
+
 
     @pl.data_loader
     def train_dataloader(self):
         # Load transforms
-        # transform = transforms.Compose([transforms.ToTensor(),
-        #                                 transforms.Normalize([0.5], [0.5])])
+        transform = transforms.Compose([transforms.ToTensor(),
+                                        transforms.Normalize([0.5], [0.5])])
 
         # Load the dataset. This is a list of file names
         dataset = RadiomicsDataset(self.hparams.img_dir,   # Path to images
@@ -87,105 +92,90 @@ class GAN(pl.LightningModule):
 
 
     # Helper funtions for forward-pass
-    # Generator forward pass
-    def forward(self, z):
-        return self.generator(z)
-    # Disciminiator forward pass
-    def discriminate(self, z) :
-        return self.discriminator.forward(z)
 
+    def forward(self, z, network="g"):
+        # Generator forward pass
+        if network == "g" :
+            return self.generator.forward(z)
 
+        # Disciminiator forward pass
+        elif network == "d" :
+            return self.discriminator.forward(z)
+        else :
+            return None
 
 
     def adversarial_loss(self, y_hat, y):
-        return F.binary_cross_entropy(y_hat, y)
+        # return F.binary_cross_entropy(y_hat, y)
+        return self.criterion(y_hat, y)
+    def L1_loss(self, X_hat, X) :
+        return self.l1(X_hat, X)
 
-    def training_step(self, batch, batch_nb, optimizer_i):
+
+    def training_step(self, batch, batch_nb, optimizer_idx):
+
+        self.zero_grad()
+
         a_img, no_a_img = batch
 
+        batch_size = a_img.size(0)
 
-        self.last_imgs = [a_img, no_a_img]
+        # Create ground truth result
+        fake_labels = torch.zeros(batch_size)
+        real_labels = torch.ones(batch_size)
 
-        ### TRAIN GENERATOR ###
-        if optimizer_i == 0:
-            # Get image and sinogram with artifacts
-            # a_img    has shape (batch_size, channels (2 or 4), 300, 300)
+        # Generate some artifact-free images
+        gen_img = self(a_img, network="g")
 
-            # generate images
-            self.generated_imgs = self.forward(a_img)
 
-            # log sampled images
-            # sample_imgs = self.generated_imgs[:6]
-            sample_imgs = [a_img[0], self.generated_imgs[0]]
-            grid = torchvision.utils.make_grid(sample_imgs)
-            self.logger.add_image(f'imgs/epoch{self.current_epoch}/batch_sample', grid, batch_nb)
+        ### TRAIN DISCRIMINATOR ###
+        if optimizer_idx == 1 :
 
-            # Run the generated images through the discriminator to see how good they are
-            gen_preds = self.discriminate(self.generated_imgs)
+            D_real = self(no_a_img, network="d").view(-1)          # Does it detect real images?
+            D_fake = self(gen_img.detach(), network="d").view(-1)  # Does it detect fake images?
 
-            # Create ground truth result (ie: all fake)
-            valid = torch.ones(gen_preds.size(0), 1)
-            # Put ground truth result on correct GPU
+
+            # Put labels on correct GPU
             if self.on_gpu:
-                valid = valid.cuda(gen_preds.device.index)
+                fake_labels = fake_labels.cuda(D_fake.device.index)
+                real_labels = real_labels.cuda(D_real.device.index)
+            # ----------------------- #
 
-            # Calculate Adversarial loss using BCE loss
-            g_loss = self.adversarial_loss(gen_preds, valid)
+            D_real_loss = self.adversarial_loss(D_real, real_labels)
+            D_fake_loss = self.adversarial_loss(D_fake, fake_labels)
+
+            D_loss = (D_real_loss + D_fake_loss)
 
             # Save the generator loss in a dictionary
-            tqdm_dict = {'g_loss': g_loss}
-            output = OrderedDict({'loss': g_loss,
+            tqdm_dict = {'d_loss': D_loss}
+            output = OrderedDict({'loss': D_loss,
+                                  'progress_bar': tqdm_dict,
+                                  'log': tqdm_dict
+                                  })
+        ### TRAIN GENERATOR ###
+        if optimizer_idx == 0 :
+            D_fake = self(gen_img, network="d").view(-1)
+
+            # Put labels on correct GPU
+            if self.on_gpu:
+                real_labels = real_labels.cuda(D_fake.device.index)
+            # ----------------------- #
+
+            G_loss = self.adversarial_loss(D_fake, real_labels)
+
+            L_loss = self.L1_loss(gen_img, no_a_img)
+
+            G_loss = L_loss + G_loss
+
+            tqdm_dict = {'g_loss': G_loss}
+            output = OrderedDict({'loss': G_loss,
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
 
-            return output
+        self.last_imgs = [a_img, no_a_img]
+        return output
 
-        ### TRAIN DISCRIMINATOR ###
-        if optimizer_i == 1:
-            # Measure discriminator's ability to classify real from generated samples
-
-            # Generate an image if previous there are none
-            # (generator train step may have happened on another GPU)
-            if self.generated_imgs is None :
-                self.generated_imgs = self.forward(a_img)
-
-            ### REAL IMAGE CLASSIFICATION ###
-            # Give the discriminator the non-artifact imgs
-            real_preds = self.discriminate(no_a_img)
-
-            # Create ground truth result (ie: all fake)
-            real = torch.ones(real_preds.size(0), 1)
-            # Put ground truth result on correct GPU
-            if self.on_gpu:
-                real = real.cuda(real_preds.device.index)
-
-            # Compute discriminator loss for real images
-            real_loss = self.adversarial_loss(real_preds, real)
-            ### ------------------------- ###
-
-            ### FAKE IMAGE CLASSIFICATION ###
-            fake_preds = self.discriminate(self.generated_imgs.detach()) # detach() detaches the
-                                                                         # output from the computational
-            # Create ground truth result (ie: all fake)                  # graph so we don't backprop
-            fake = torch.zeros(fake_preds.size(0), 1)                    # through it.
-            # Put ground truth result on correct GPU
-            if self.on_gpu:
-                fake = fake.cuda(fake_preds.device.index)
-
-            # Compute discriminator loss for fake images
-            fake_loss = self.adversarial_loss(fake_preds, fake)
-            ### ------------------------- ###
-
-            # discriminator loss is the average of these
-            d_loss = (real_loss + fake_loss) / 2
-            tqdm_dict = {'d_loss': d_loss}
-            output = OrderedDict({
-                'loss': d_loss,
-                'progress_bar': tqdm_dict,
-                'log': tqdm_dict
-            })
-            return output
 
 
 
@@ -193,25 +183,32 @@ class GAN(pl.LightningModule):
         lr = self.hparams.lr
         b1 = self.hparams.b1
         b2 = self.hparams.b2
-
+        # opt_g = torch.optim.Adam([{'params': self.generator.parameters()}], lr=lr, betas=(b1, b2))
+        # opt_d = torch.optim.Adam([{'params': self.discriminator.parameters()}], lr=lr, betas=(b1, b2))
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
         opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2))
         return [opt_g, opt_d], []
 
 
-
     def on_epoch_end(self):
-        # a_img, no_a_img = self.last_imgs[0], self.last_imgs[1]
-        #
-        # # log sampled images (with most recent batch img)
-        # gen_imgs = self.forward(a_img)
-        # grid1 = torchvision.utils.make_grid(a_img[0:7])
-        # grid2 = torchvision.utils.make_grid(no_a_img[0:7])
-        # grid3 = torchvision.utils.make_grid(gen_imgs[0:7])
-        # self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_orig_w_artifact', grid1, 0)
-        # self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_orig_n_artifact', grid2, 0)
-        # self.logger.add_image(f'imgs/epoch{self.current_epoch}/epoch_end_generated', grid3, 0)
-        pass
+        a_img, no_a_img = self.last_imgs[0], self.last_imgs[1]
+
+        # log sampled images (with most recent batch img)
+        gen_imgs = self.forward(a_img)
+        grid1 = torchvision.utils.make_grid(a_img[0:3])
+        grid2 = torchvision.utils.make_grid(no_a_img[0:3])
+        grid3 = torchvision.utils.make_grid(gen_imgs[0:3])
+        self.logger.experiment.add_image(f'imgs/epoch{self.current_epoch}/orig_w_artifact', grid1, 0)
+        self.logger.experiment.add_image(f'imgs/epoch{self.current_epoch}/orig_n_artifact', grid2, 0)
+        self.logger.experiment.add_image(f'imgs/epoch{self.current_epoch}/generated', grid3, 0)
+        # pass
+
+
+def dontloghparams(x) :
+    """Hacky workaround to hparam logging being
+    broken in pytorch ligthning"""
+    # TO fix this, write custom logger
+    return
 
 
 def main(hparams):
@@ -219,17 +216,16 @@ def main(hparams):
     # 1 INIT LIGHTNING MODEL
     # ------------------------
     model = GAN(hparams)
-    exp = Experiment(save_dir=hparams.logdir)
 
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    # trainer = pl.Trainer(max_nb_epochs=10, gpus=hparams.ngpu, distributed_backend='ddp')
-    # trainer = pl.Trainer(max_nb_epochs=10, , distributed_backend='ddp')
-    trainer = pl.Trainer(exp, max_nb_epochs=100,
-                         #amp_level='O2', use_amp=False,
-                         distributed_backend='dp', gpus=[0, 1, 2, 3],
-                         # distributed_backend='dp', gpus=[0, 1, 2, 3]
+    logger  = TensorBoardLogger(hparams.logdir, name="DA_Reduction_GAN")
+    logger.log_hyperparams = dontloghparams
+    trainer = pl.Trainer(logger=logger, # At the moment, PTL breaks when using builtin logger
+                         max_nb_epochs=100,
+                         distributed_backend="dp",
+                         gpus=[0]
                          )
 
     # ------------------------

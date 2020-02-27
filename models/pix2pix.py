@@ -98,7 +98,7 @@ class UNet2D(nn.Module):
                         ),
                     ),
                     (name + "norm1", nn.BatchNorm2d(num_features=features)),
-                    (name + "relu1", nn.ReLU(inplace=True)),
+                    (name + "relu1", nn.LeakyReLU(0.2, inplace=True)),
                     (
                         name + "conv2",
                         nn.Conv2d(
@@ -110,7 +110,7 @@ class UNet2D(nn.Module):
                         ),
                     ),
                     (name + "norm2", nn.BatchNorm2d(num_features=features)),
-                    (name + "relu2", nn.ReLU(inplace=True)),
+                    (name + "relu2", nn.LeakyReLU(0.2, inplace=True)),
                 ]
             )
         )
@@ -139,7 +139,7 @@ class Discriminator(nn.Module):
         # Input :           (batch_size, Channels_in, H, W)
 
         self.pool = nn.MaxPool2d(2, 2) # (kernel_size, stride)
-        self.LRelu = nn.LeakyReLU(0.01)
+        self.LRelu = nn.LeakyReLU(0.2)
 
         self.conv1 = nn.Conv2d(1, 4, 5, padding=2)
         self.conv1_bn = nn.BatchNorm2d(4)
@@ -162,20 +162,33 @@ class Discriminator(nn.Module):
 
         self.softmax = torch.nn.Softmax(dim=1)
 
+        self.sigmoid = torch.nn.Sigmoid()
+
+        self.linear = nn.Linear(300*300, output_dim)
+        self.linear.requires_grad = True
 
     def forward(self, X):
+        # print(X.requires_grad)
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
+        # print(X.requires_grad)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
         X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
         X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
         X = self.conv5_bn(self.LRelu(self.conv5(X)))
         X = self.avgPool(X)
 
+        # print(X.requires_grad)
+
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, 64 * 9 * 9)
-        validity = self.fc3(X)
+        X = self.fc3(X)
+
+        # X = X.view(-1, 300*300)
+        # X = self.linear(X)
+        # print(X.requires_grad)
 
         # Constrain output of model to (0, 1)
-        validity = self.softmax(validity)
+        X = self.sigmoid(X)
 
-        return validity
+
+        return X

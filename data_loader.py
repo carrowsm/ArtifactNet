@@ -187,7 +187,7 @@ class RadiomicsDataset(data.Dataset):
         elif z == 2 :
             # We only have the images, no sinograms
             artifact_arr     = image_stack[0, :, :]     # 2D image with shape (height, width)
-            no_artifact_arr  = image_stack[1 , :, :]    # 2D image with shape (height, width)
+            no_artifact_arr  = image_stack[1, :, :]     # 2D image with shape (height, width)
 
             # The Pytorch model takes a tensor of shape (batch_size, in_Channels, height, width)
             # Reshape the arrays to add another dimension
@@ -202,9 +202,8 @@ class RadiomicsDataset(data.Dataset):
 
 
         # Convert the np.arrays to PyTorch tensors
-        artifact_tensor    = torch.from_numpy( artifact_arr).float()
-        no_artifact_tensor = torch.from_numpy( no_artifact_arr).float()
-
+        artifact_tensor    = torch.tensor( artifact_arr, dtype=torch.float32)
+        no_artifact_tensor = torch.tensor( no_artifact_arr, dtype=torch.float32)
 
 
         return artifact_tensor, no_artifact_tensor
