@@ -27,7 +27,7 @@ def load_image_data_frame(path) :
 
 
 
-def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", data_augmentation_factor=1, test_size=0.25):
+def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", suffix="", data_augmentation_factor=1, test_size=0.25):
     """
     Finds all images in the specified directory and returns a list of the file names
     in that directory.  The data is also split into a training and test group, then
@@ -52,6 +52,8 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", data_augmentat
     Returns:
         Two lists: A list of paths for all the training images and another for test.
     """
+    if len(suffix) > 0  :
+        suffix = suffix + "." + f_type
 
     if y_da_df is None or y_da_df is None:
         file_list = []
@@ -77,8 +79,8 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", data_augmentat
         return train, test
     else :
         y_da_df, n_da_df = y_da_df.to_frame(), n_da_df.to_frame()
-        y_da_df["paths"] = dir + "/" + y_da_df.index.values + "." + f_type   # Paths to DA+ images
-        n_da_df["paths"] = dir + "/" + n_da_df.index.values + "." + f_type   # Paths to DA- images
+        y_da_df["paths"] = dir + "/" + y_da_df.index.values + suffix   # Paths to DA+ images
+        n_da_df["paths"] = dir + "/" + n_da_df.index.values + suffix   # Paths to DA- images
 
         y = y_da_df.loc[:, "DA_z" : "paths"].values           # np array with one col
         n = n_da_df.loc[:, "DA_z" : "paths"].values           # for paths, one for z-index
@@ -111,20 +113,29 @@ class UnpairedDataset(t_data.Dataset):
 
     Attributes:
 
-        image_names : list
-            A tuple where the first element is the list of full paths to image files
-            from class X, the second element is the list of paths to class Y.
-        image_centre : list (shape (2, N) or (2, N, 3)), None
-            A list of the pixel index to use for each image.
-            - If None, the image will be cropped around its centre.
-            - If the list has shape (2, N), it will be assumed that each element is
-              the z-index of the slice of interest and any cropping will occur
-              around the centre of that slice.
-            - If the list has shape (2, N, 3) each element represents the (z, y, x)
-              coordinates of the pixel around which to crop and rotate.
-            - List must have same order as image_names.
+        X_image_names : array, shape(N, 1)
+            A column vector were each row is the full path to the image file of
+            a patient from domain X.
+        Y_image_names : array, shape(N, 1)
+            A column vector were each row is the full path to the image file of
+            a patient from domain X.
+        X_image_centre : list (shape (N,) or (N, 3)), None
+            A list of the pixel index to use for each image from domain X.
+            - If None, each image will be cropped around its centre.
+            - If the list has shape (N,) (a 1D vector of len N), it will
+              be assumed that each element is the z-index of the slice of
+              interest and any cropping will occur around the centre of that slice.
+            - If the list has shape (N, 3) (a matrix of len N with 3 columns)
+              the columns represents the (z, y, x) coordinates of the pixel around
+              which to crop and rotate. Each row is the z,y,x pixel for a patient.
+            - List must have same order as X_image_names.
+        Y_image_centre : list (shape (M,) or (M, 3)), None
+            A list of the pixel index to use for each image from domain Y.
+            - Must have the same number of columns as X_image_centre, but can
+              have different length.
+            - Treated exactly the same as X_image_centre.
         image_size : int, list, None
-            The size of the image to use.
+            The size of the image to use (same for both domains X and Y).
             - If None, use the entire image (centre_pix will be ignored).
             - If int=a, each image will be cropped to form a cube of size
               a^3 aroud centre_pix.
@@ -132,9 +143,9 @@ class UnpairedDataset(t_data.Dataset):
               crop all images to.
         transform : list
             - A list containing the names of the random transforms to be applied.
-            - Accepted names are ["rotatate", "flip" ]
+            - Accepted names are ["rotatate", "flip" ].
         file_type: str, (default: "nrrd")
-            - The file type to load. Can be either "npy" or "nrrd" or "dicom"
+            - The file type to load. Can be either "npy" or "nrrd" or "dicom".
 
 
     Methods :
@@ -143,21 +154,27 @@ class UnpairedDataset(t_data.Dataset):
     """
 
     def __init__(self,
-                 image_names,           #
-                 file_type="nrrd",      # Either nrrd or npy
-                 image_centre=None,      # Slice around which to crop
+                 X_image_names,
+                 Y_image_names,
+                 X_image_centre=None,
+                 Y_image_centre=None,
+                 file_type="nrrd",
                  image_size=None,
                  transform=None):
 
         # self.root_dir     = image_root_dir
-        self.x_img_paths  = image_names[0]
-        self.y_img_paths  = image_names[1]
+        self.x_img_paths  = X_image_names # Paths to images in domain X
+        self.y_img_paths  = Y_image_names # Paths to images in domain Y
         self.file_type    = file_type
-        self.image_centre = image_centre
+        self.x_img_centre = X_image_centre
+        self.y_img_centre = Y_image_centre
         self.image_size   = image_size
-        self.transform    = transform
+        self.transforms    = transform
 
-        self.dataset_length = np.max(image_names[0], image_names[1])  # Total number of images (max from either class)
+        # Total number of images (max from either class)
+        self.x_size = len(X_image_names)
+        self.y_size = len(Y_image_names)
+        self.dataset_length = np.max([self.x_size, self.y_size])
 
         # Get the correct function to load the image type
         self.load_img = self.get_img_loader()
@@ -181,42 +198,47 @@ class UnpairedDataset(t_data.Dataset):
     """ IMAGE CROPPING FUNTIONS """
     def get_cropper(self) :
         """ Identify which cropping function should be used """
-        if image_size is None :                         # No cropping
+        if self.image_size is None :                         # No cropping
+            self.x_img_centre = np.zeros((self.dataset_length, 3))  # A dummy array that the cropping fn accepts
+            self.y_img_centre = np.zeros((self.dataset_length, 3))
             return lambda X, size, p : X                # return original image
         else :
             if type(self.image_size) == int :
                 i = self.image_size                     # Make image size into a list
                 self.image_size = [i, i, i]             # of size in each axis
 
-            if self.image_centre is None :              # No centre pixel given,
+            if self.x_img_centre is None :              # No centre pixel given,
                 return self.centre_crop                 # crop around image centre
             else :
-                self.image_centre = np.array(self.image_centre)
-                if len(self.image_centre.shape) == 3 :  # Image centre given,
-                    return self.point_crop              # Crop around it
-                elif len(self.image_centre.shape) == 2 :# Only slice index given,
-                    return self.slize_crop              # crop around centre of slice
+                # self.image_centre = np.array(self.image_centre)
+                if self.x_img_centre.ndim == 1 :            # Only slice index given,
+                    return self.slice_crop                  # crop around centre of slice
+                elif self.x_img_centre.ndim == 2 and self.x_img_centre.shape[-1] == 3 :
+                    return self.point_crop                  # Image centre given,
+                                                            # Crop around it
                 else :
                     raise Exception("This format of image_centre cannot be used.")
 
-    def centre_crop(self, X, size, p=None) :
+    def centre_crop(self, z, size=None, p=None) :
         """ Crop an image arond its centre """
-        p = np.array(X.shape) // 2   # Centre of image
-        return self.crop(X, p, size[0], size[1], size[2])
+        p = np.array(z.shape) // 2   # Centre of image
+        return self.crop(z, p, size)
 
-    def slice_crop(self, X, size, p: int) :
-        """ Crop an image around the centre of a particular slice.  """
-        py, px = np.array(X[p].shape) // 2   # Centre of slice
-        return self.crop(X, [p, py, px], size[0], size[1], size[2])
+    def slice_crop(self, z, size=None, p:int=None) :
+        """ Crop an image z around the centre of a particular slice p.  """
+        py, px = np.array(z[p, :, :].shape) // 2   # Centre of slice
+        return self.crop(z, [p, py, px], size)
 
-    def point_crop(self, X, size, p: list) :
+    def point_crop(self, z, size=None, p:int=list) :
         """ Crop an image around a point, given as p = [z, y, x] """
-        return self.crop(X, p, size[0], size[1], size[2])
+        return self.crop(z, p, size)
 
-    def crop(self, X, p, z_size, y_size, x_size) :
-        zs, ys, xs = z_size // 2, y_size // 2, x_size // 2
-        z, y, x = p[0], p[1], [2]
-        return X[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
+    def crop(self, Z, p, size) :
+        # Get size of image volume in each direction
+        zs, ys, xs = size[0] // 2, size[1] // 2, size[2] // 2
+        # Get coordinates of pixel around which to crop
+        z, y, x = p[0], p[1], p[2]
+        return Z[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
     """ ########################## """
 
 
@@ -228,6 +250,7 @@ class UnpairedDataset(t_data.Dataset):
     def transform(self, X) :
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
+        X = np.clip(X, -1000.0, 1000.0)
         return X
 
 
@@ -235,17 +258,18 @@ class UnpairedDataset(t_data.Dataset):
         '''
 
         '''
-        # Get the image path from each class
-        # path_x = os.path.join(self.root_dir, self.image_names[index])
-        # path_y = os.path.join(self.root_dir, self.image_names[index])
+        # Randomize index for images in Y domain to avoid pairs
+        x_index = index
+        y_index = np.random.randint(0, self.y_size - 1)
+
 
         # Load the image from each class
-        X = self.load_img(self.x_img_paths[index])
-        Y = self.load_img(self.y_img_paths[index])
+        X = self.load_img(self.x_img_paths[x_index])
+        Y = self.load_img(self.y_img_paths[y_index])
 
         # Crop the image
-        X = self.crop_img(X, self.image_size, self.image_centre[0, index, :])
-        Y = self.crop_img(Y, self.image_size, self.image_centre[1, index, :])
+        X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
+        Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
 
         # Transform the image (augmentation)
         X = self.transform(X)
@@ -277,12 +301,13 @@ class PairedDataset(object):
             A list of file names. These can be tuples, each containing the paths
             for both paired images. Alternatively they can be a 1D list of paths
             where each (npy/nrrd) file contains boths images to make the pair.
-        centre_pix : list (shape N or (N, 3), None
+        centre_pix : list (shape (N, 2) or (3, N, 2), None
             A list of the pixel index to use for each image.
             - If None, the image will be cropped around its centre to image_size.
-            - If the list has shape (N), it will be assumed that each element is
-              the z-index of the slice of interest and any cropping will occur
-              around the centre of that slice.
+            - If the list has shape (N, 2), it will be assumed that each element is
+              the z-index of the slice of interest with each column corresponding to
+              one of the two image classes and any cropping will occur around the
+              centre of that slice.
             - If the list has shape (N, 3) each element represents the (z, y, x)
               coordinates of the pixel around which to crop and rotate.
             - List must have same order as image_names.
@@ -368,31 +393,62 @@ class PairedDataset(object):
 
 
 
+
+
+
+
 if __name__ == '__main__':
     ### Unit testing ###
     import matplotlib as mpl
     mpl.use("Qt5Agg")
     import matplotlib.pyplot as plt
 
+    def plt_imgs(X, Y, fname="") :
+        fig, ax = plt.subplots(ncols=2, nrows=1)
+        ax[0].imshow(x[x.shape[0]//2, :, :])
+        ax[1].imshow(y[x.shape[0]//2, :, :])
+        ax[0].set_title("X")
+        ax[1].set_title("Y")
+        plt.savefig(fname)
+
 
     # Import CSV containing DA labels
     csv_path = "/cluster/home/carrowsm/data/radcure_DA_labels.csv"
-    dir = "/cluster/projects/radiomics/Temp/RADFINAL/img"
+    dir = "/cluster/projects/radiomics/Temp/RADCURE-npy/img"
     y_df, n_df = load_image_data_frame(csv_path)
 
 
     # Create train and test sets for each DA+ and DA- imgs
     files = load_img_names(dir, y_da_df=y_df, n_da_df=n_df,
-                           f_type="nrrd", data_augmentation_factor=1,
+                           f_type="npy", suffix="_img",
+                           data_augmentation_factor=1,
                            test_size=0.25)
 
     y_train, n_train, y_test, n_test = files
-    print(len(y_train), len(y_test))
+
+    """
+    y_train is a matrix with len N and two columns:
+    y_train[:, 0] = z-index of DA in each patient
+    y_train[:, 1] = full path to each patient's image file
+    """
+
+
+    print(y_train.shape, n_train.shape)
+    print(y_train[:, 0].shape)
 
 
     # Test data loader
-    paths = [y_train[ : , 0], n_train[ : , 0]]
-    dataset = UnpairedDataset(paths, file_type="nrrd",
-                              image_centre=None,
-                              image_size=None,
+    dataset = UnpairedDataset(y_train[ :, 1],
+                              n_train[ :, 1],
+                              file_type="npy",
+                              X_image_centre=y_train[:, 0],
+                              Y_image_centre=n_train[:, 0],
+                              image_size=[50, 500, 500],
                               transform=None)
+    # Get a test image set
+    x, y = dataset[2]
+
+    print(x.shape, y.shape)
+
+    # Save the image
+    plt_imgs(x, y, fname="1.png")

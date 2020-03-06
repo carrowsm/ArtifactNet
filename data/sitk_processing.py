@@ -11,7 +11,10 @@ from skimage.transform import resize
 def read_nrrd_image(nrrd_file_path) :
     image = sitk.ReadImage(nrrd_file_path)
 
-    return image
+    imageArray = sitk.GetArrayFromImage(image)
+
+    return imageArray
+
 
 
 def read_dicom_image(dicom_path) :
@@ -23,7 +26,9 @@ def read_dicom_image(dicom_path) :
     reader.SetFileNames(dicom_names)
     image = reader.Execute()
 
-    return image
+    imageArray = sitk.GetArrayFromImage(image)
+
+    return imageArray
 
 
 def resample_image(image, new_spacing=[1,1,1]):
