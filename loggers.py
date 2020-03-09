@@ -3,6 +3,8 @@ import os
 import json
 
 
+def log_imgs(img1, img2) :
+    
 
 class MyLogger(LightningLoggerBase):
     def __init__(self, logdir=None, save_hparams=False, use_tb=True):

@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 ### EDIT THESE PATHS ###
 # Remote
-img_path = "/cluster/home/carrowsm/data/Simulated_DA/"
+img_dir = "/cluster/home/carrowsm/data/Simulated_DA/"
 img_suffix = ".npy"                 # This string follows the patient ID in the filename
 log_dir = "/cluster/home/carrowsm/logs/artifact_net/remove/"
 
@@ -15,21 +15,14 @@ log_dir = "/cluster/home/carrowsm/logs/artifact_net/remove/"
 
 parser = ArgumentParser()
 
+parser.add_argument("--csv_path", type=str, default="",
+help="Path to the CSV containing all image DA statuses and DA locations")
 parser.add_argument("--img_dir", default=img_path, type=str, help="Path to the input image data.")
 parser.add_argument("--img_suffix", default=img_suffix, type=str)
 
 parser.add_argument("--data_type", default="phantom", type=str,
 help="'phantom' if we are using artificial input images, 'real' if we are using patient CT scans.")
-parser.add_argument("--logdir", default=log_dir, type=str, help='Where to save results.')
-
-
-parser.add_argument("--norm_lower", default=0.64, type=float)
-parser.add_argument("--norm_upper", default=0.86, type=float)
-
-parser.add_argument("--test", action='store_true', help="If the test option is given, code will only process a few images.")
-
-parser.add_argument("--ncpu", default=1, type=int, help="Number of CPUs to use.")
-parser.add_argument("--ngpu", default=1, type=int, help="Number of GPUs to use.")
+parser.add_argument("--log_dir", default=log_dir, type=str, help='Where to save results.')
 
 
 ### Args for model training ###
