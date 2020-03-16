@@ -1,0 +1,206 @@
+Starting Shell Script
+Started python script.
+INFO:root:Set SLURM handle signals.
+INFO:root:
+    | Name                           | Type            | Params
+---------------------------------------------------------------
+0   | g_y                            | UNet3D          | 89 M  
+1   | g_y.encoder1                   | Sequential      | 112 K 
+2   | g_y.encoder1.enc1conv1         | Conv3d          | 1 K   
+3   | g_y.encoder1.enc1norm1         | BatchNorm3d     | 128   
+4   | g_y.encoder1.enc1relu1         | LeakyReLU       | 0     
+5   | g_y.encoder1.enc1conv2         | Conv3d          | 110 K 
+6   | g_y.encoder1.enc1norm2         | BatchNorm3d     | 128   
+7   | g_y.encoder1.enc1relu2         | LeakyReLU       | 0     
+8   | g_y.pool1                      | MaxPool3d       | 0     
+9   | g_y.encoder2                   | Sequential      | 664 K 
+10  | g_y.encoder2.enc2conv1         | Conv3d          | 221 K 
+11  | g_y.encoder2.enc2norm1         | BatchNorm3d     | 256   
+12  | g_y.encoder2.enc2relu1         | LeakyReLU       | 0     
+13  | g_y.encoder2.enc2conv2         | Conv3d          | 442 K 
+14  | g_y.encoder2.enc2norm2         | BatchNorm3d     | 256   
+15  | g_y.encoder2.enc2relu2         | LeakyReLU       | 0     
+16  | g_y.pool2                      | MaxPool3d       | 0     
+17  | g_y.encoder3                   | Sequential      | 2 M   
+18  | g_y.encoder3.enc3conv1         | Conv3d          | 884 K 
+19  | g_y.encoder3.enc3norm1         | BatchNorm3d     | 512   
+20  | g_y.encoder3.enc3relu1         | LeakyReLU       | 0     
+21  | g_y.encoder3.enc3conv2         | Conv3d          | 1 M   
+22  | g_y.encoder3.enc3norm2         | BatchNorm3d     | 512   
+23  | g_y.encoder3.enc3relu2         | LeakyReLU       | 0     
+24  | g_y.pool3                      | MaxPool3d       | 0     
+25  | g_y.encoder4                   | Sequential      | 10 M  
+26  | g_y.encoder4.enc4conv1         | Conv3d          | 3 M   
+27  | g_y.encoder4.enc4norm1         | BatchNorm3d     | 1 K   
+28  | g_y.encoder4.enc4relu1         | LeakyReLU       | 0     
+29  | g_y.encoder4.enc4conv2         | Conv3d          | 7 M   
+30  | g_y.encoder4.enc4norm2         | BatchNorm3d     | 1 K   
+31  | g_y.encoder4.enc4relu2         | LeakyReLU       | 0     
+32  | g_y.pool4                      | MaxPool3d       | 0     
+33  | g_y.bottleneck                 | Sequential      | 42 M  
+34  | g_y.bottleneck.bottleneckconv1 | Conv3d          | 14 M  
+35  | g_y.bottleneck.bottlenecknorm1 | BatchNorm3d     | 2 K   
+36  | g_y.bottleneck.bottleneckrelu1 | LeakyReLU       | 0     
+37  | g_y.bottleneck.bottleneckconv2 | Conv3d          | 28 M  
+38  | g_y.bottleneck.bottlenecknorm2 | BatchNorm3d     | 2 K   
+39  | g_y.bottleneck.bottleneckrelu2 | LeakyReLU       | 0     
+40  | g_y.upconv4                    | ConvTranspose3d | 4 M   
+41  | g_y.decoder4                   | Sequential      | 21 M  
+42  | g_y.decoder4.dec4conv1         | Conv3d          | 14 M  
+43  | g_y.decoder4.dec4norm1         | BatchNorm3d     | 1 K   
+44  | g_y.decoder4.dec4relu1         | LeakyReLU       | 0     
+45  | g_y.decoder4.dec4conv2         | Conv3d          | 7 M   
+46  | g_y.decoder4.dec4norm2         | BatchNorm3d     | 1 K   
+47  | g_y.decoder4.dec4relu2         | LeakyReLU       | 0     
+48  | g_y.upconv3                    | ConvTranspose3d | 131 K 
+49  | g_y.decoder3                   | Sequential      | 5 M   
+50  | g_y.decoder3.dec3conv1         | Conv3d          | 3 M   
+51  | g_y.decoder3.dec3norm1         | BatchNorm3d     | 512   
+52  | g_y.decoder3.dec3relu1         | LeakyReLU       | 0     
+53  | g_y.decoder3.dec3conv2         | Conv3d          | 1 M   
+54  | g_y.decoder3.dec3norm2         | BatchNorm3d     | 512   
+55  | g_y.decoder3.dec3relu2         | LeakyReLU       | 0     
+56  | g_y.upconv2                    | ConvTranspose3d | 262 K 
+57  | g_y.decoder2                   | Sequential      | 1 M   
+58  | g_y.decoder2.dec2conv1         | Conv3d          | 884 K 
+59  | g_y.decoder2.dec2norm1         | BatchNorm3d     | 256   
+60  | g_y.decoder2.dec2relu1         | LeakyReLU       | 0     
+61  | g_y.decoder2.dec2conv2         | Conv3d          | 442 K 
+62  | g_y.decoder2.dec2norm2         | BatchNorm3d     | 256   
+63  | g_y.decoder2.dec2relu2         | LeakyReLU       | 0     
+64  | g_y.upconv1                    | ConvTranspose3d | 65 K  
+65  | g_y.decoder1                   | Sequential      | 332 K 
+66  | g_y.decoder1.dec1conv1         | Conv3d          | 221 K 
+67  | g_y.decoder1.dec1norm1         | BatchNorm3d     | 128   
+68  | g_y.decoder1.dec1relu1         | LeakyReLU       | 0     
+69  | g_y.decoder1.dec1conv2         | Conv3d          | 110 K 
+70  | g_y.decoder1.dec1norm2         | BatchNorm3d     | 128   
+71  | g_y.decoder1.dec1relu2         | LeakyReLU       | 0     
+72  | g_y.conv                       | Conv3d          | 65    
+73  | g_x                            | UNet3D          | 89 M  
+74  | g_x.encoder1                   | Sequential      | 112 K 
+75  | g_x.encoder1.enc1conv1         | Conv3d          | 1 K   
+76  | g_x.encoder1.enc1norm1         | BatchNorm3d     | 128   
+77  | g_x.encoder1.enc1relu1         | LeakyReLU       | 0     
+78  | g_x.encoder1.enc1conv2         | Conv3d          | 110 K 
+79  | g_x.encoder1.enc1norm2         | BatchNorm3d     | 128   
+80  | g_x.encoder1.enc1relu2         | LeakyReLU       | 0     
+81  | g_x.pool1                      | MaxPool3d       | 0     
+82  | g_x.encoder2                   | Sequential      | 664 K 
+83  | g_x.encoder2.enc2conv1         | Conv3d          | 221 K 
+84  | g_x.encoder2.enc2norm1         | BatchNorm3d     | 256   
+85  | g_x.encoder2.enc2relu1         | LeakyReLU       | 0     
+86  | g_x.encoder2.enc2conv2         | Conv3d          | 442 K 
+87  | g_x.encoder2.enc2norm2         | BatchNorm3d     | 256   
+88  | g_x.encoder2.enc2relu2         | LeakyReLU       | 0     
+89  | g_x.pool2                      | MaxPool3d       | 0     
+90  | g_x.encoder3                   | Sequential      | 2 M   
+91  | g_x.encoder3.enc3conv1         | Conv3d          | 884 K 
+92  | g_x.encoder3.enc3norm1         | BatchNorm3d     | 512   
+93  | g_x.encoder3.enc3relu1         | LeakyReLU       | 0     
+94  | g_x.encoder3.enc3conv2         | Conv3d          | 1 M   
+95  | g_x.encoder3.enc3norm2         | BatchNorm3d     | 512   
+96  | g_x.encoder3.enc3relu2         | LeakyReLU       | 0     
+97  | g_x.pool3                      | MaxPool3d       | 0     
+98  | g_x.encoder4                   | Sequential      | 10 M  
+99  | g_x.encoder4.enc4conv1         | Conv3d          | 3 M   
+100 | g_x.encoder4.enc4norm1         | BatchNorm3d     | 1 K   
+101 | g_x.encoder4.enc4relu1         | LeakyReLU       | 0     
+102 | g_x.encoder4.enc4conv2         | Conv3d          | 7 M   
+103 | g_x.encoder4.enc4norm2         | BatchNorm3d     | 1 K   
+104 | g_x.encoder4.enc4relu2         | LeakyReLU       | 0     
+105 | g_x.pool4                      | MaxPool3d       | 0     
+106 | g_x.bottleneck                 | Sequential      | 42 M  
+107 | g_x.bottleneck.bottleneckconv1 | Conv3d          | 14 M  
+108 | g_x.bottleneck.bottlenecknorm1 | BatchNorm3d     | 2 K   
+109 | g_x.bottleneck.bottleneckrelu1 | LeakyReLU       | 0     
+110 | g_x.bottleneck.bottleneckconv2 | Conv3d          | 28 M  
+111 | g_x.bottleneck.bottlenecknorm2 | BatchNorm3d     | 2 K   
+112 | g_x.bottleneck.bottleneckrelu2 | LeakyReLU       | 0     
+113 | g_x.upconv4                    | ConvTranspose3d | 4 M   
+114 | g_x.decoder4                   | Sequential      | 21 M  
+115 | g_x.decoder4.dec4conv1         | Conv3d          | 14 M  
+116 | g_x.decoder4.dec4norm1         | BatchNorm3d     | 1 K   
+117 | g_x.decoder4.dec4relu1         | LeakyReLU       | 0     
+118 | g_x.decoder4.dec4conv2         | Conv3d          | 7 M   
+119 | g_x.decoder4.dec4norm2         | BatchNorm3d     | 1 K   
+120 | g_x.decoder4.dec4relu2         | LeakyReLU       | 0     
+121 | g_x.upconv3                    | ConvTranspose3d | 131 K 
+122 | g_x.decoder3                   | Sequential      | 5 M   
+123 | g_x.decoder3.dec3conv1         | Conv3d          | 3 M   
+124 | g_x.decoder3.dec3norm1         | BatchNorm3d     | 512   
+125 | g_x.decoder3.dec3relu1         | LeakyReLU       | 0     
+126 | g_x.decoder3.dec3conv2         | Conv3d          | 1 M   
+127 | g_x.decoder3.dec3norm2         | BatchNorm3d     | 512   
+128 | g_x.decoder3.dec3relu2         | LeakyReLU       | 0     
+129 | g_x.upconv2                    | ConvTranspose3d | 262 K 
+130 | g_x.decoder2                   | Sequential      | 1 M   
+131 | g_x.decoder2.dec2conv1         | Conv3d          | 884 K 
+132 | g_x.decoder2.dec2norm1         | BatchNorm3d     | 256   
+133 | g_x.decoder2.dec2relu1         | LeakyReLU       | 0     
+134 | g_x.decoder2.dec2conv2         | Conv3d          | 442 K 
+135 | g_x.decoder2.dec2norm2         | BatchNorm3d     | 256   
+136 | g_x.decoder2.dec2relu2         | LeakyReLU       | 0     
+137 | g_x.upconv1                    | ConvTranspose3d | 65 K  
+138 | g_x.decoder1                   | Sequential      | 332 K 
+139 | g_x.decoder1.dec1conv1         | Conv3d          | 221 K 
+140 | g_x.decoder1.dec1norm1         | BatchNorm3d     | 128   
+141 | g_x.decoder1.dec1relu1         | LeakyReLU       | 0     
+142 | g_x.decoder1.dec1conv2         | Conv3d          | 110 K 
+143 | g_x.decoder1.dec1norm2         | BatchNorm3d     | 128   
+144 | g_x.decoder1.dec1relu2         | LeakyReLU       | 0     
+145 | g_x.conv                       | Conv3d          | 65    
+146 | d_y                            | PatchGAN_3D     | 569 K 
+147 | d_y.conv1                      | Conv3d          | 4 K   
+148 | d_y.Lrelu                      | LeakyReLU       | 0     
+149 | d_y.conv2                      | Conv3d          | 524 K 
+150 | d_y.bnorm                      | BatchNorm3d     | 256   
+151 | d_y.conv3                      | Conv3d          | 8 K   
+152 | d_y.convf                      | Conv3d          | 32 K  
+153 | d_y.sigmoid                    | Sigmoid         | 0     
+154 | d_x                            | PatchGAN_3D     | 569 K 
+155 | d_x.conv1                      | Conv3d          | 4 K   
+156 | d_x.Lrelu                      | LeakyReLU       | 0     
+157 | d_x.conv2                      | Conv3d          | 524 K 
+158 | d_x.bnorm                      | BatchNorm3d     | 256   
+159 | d_x.conv3                      | Conv3d          | 8 K   
+160 | d_x.convf                      | Conv3d          | 32 K  
+161 | d_x.sigmoid                    | Sigmoid         | 0     
+162 | l1_loss                        | L1Loss          | 0     
+163 | mse_loss                       | MSELoss         | 0     
+0it [00:00, ?it/s]  0%|          | 0/966 [00:00<?, ?it/s]Epoch 1:   0%|          | 0/966 [00:00<?, ?it/s]Traceback (most recent call last):
+  File "/cluster/home/carrowsm/ArtifactNet/cycleGAN.py", line 294, in <module>
+    main(hparams)
+  File "/cluster/home/carrowsm/ArtifactNet/cycleGAN.py", line 285, in main
+    trainer.fit(model)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/trainer.py", line 941, in fit
+    self.run_pretrain_routine(model)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/trainer.py", line 1077, in run_pretrain_routine
+    self.train()
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/training_loop.py", line 363, in train
+    self.run_training_epoch()
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/training_loop.py", line 433, in run_training_epoch
+    output = self.run_training_batch(batch, batch_idx)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/training_loop.py", line 568, in run_training_batch
+    loss = optimizer_closure()
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/training_loop.py", line 535, in optimizer_closure
+    split_batch, batch_idx, opt_idx, self.hiddens)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/pytorch_lightning/trainer/training_loop.py", line 684, in training_forward
+    output = self.model.training_step(*args)
+  File "/cluster/home/carrowsm/ArtifactNet/cycleGAN.py", line 169, in training_step
+    gen_x = self.g_x(y)         # Generate fake DA+ images from some real DA- imgs
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/cluster/home/carrowsm/ArtifactNet/models/generators.py", line 114, in forward
+    bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 19, 19)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/torch/nn/modules/pooling.py", line 210, in forward
+    self.return_indices)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/torch/_jit_internal.py", line 181, in fn
+    return if_false(*args, **kwargs)
+  File "/cluster/home/carrowsm/anaconda3/envs/DAnet/lib/python3.7/site-packages/torch/nn/functional.py", line 520, in _max_pool3d
+    input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Given input size: (512x1x63x63). Calculated output size: (512x0x31x31). Output size is too small
+Epoch 1:   0%|          | 0/966 [00:48<?, ?it/s]
+Python script finished.

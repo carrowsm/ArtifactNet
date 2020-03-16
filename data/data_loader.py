@@ -7,7 +7,7 @@ from sklearn.utils import shuffle
 import torch
 import torch.utils.data as t_data
 
-from sitk_processing import read_dicom_image, resample_image, read_nrrd_image
+from data.sitk_processing import read_dicom_image, resample_image, read_nrrd_image
 
 
 
@@ -275,10 +275,14 @@ class UnpairedDataset(t_data.Dataset):
         X = self.transform(X)
         Y = self.transform(Y)
 
+        # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
+        # Reshape the arrays to add another dimension
+        X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
 
         # Convert the np.arrays to PyTorch tensors
-        X_tensor = torch.tensor( X, dtype=torch.float32)
-        Y_tensor = torch.tensor( Y, dtype=torch.float32)
+        X_tensor = torch.tensor(X, dtype=torch.float32)
+        Y_tensor = torch.tensor(Y, dtype=torch.float32)
 
 
         return X_tensor, Y_tensor

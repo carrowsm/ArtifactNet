@@ -33,6 +33,7 @@ from models.generators import UNet3D
 from models.discriminators import PatchGAN_3D
 
 
+
 """
 This script trains a cycleGAN to remove dental artifacts from radcure images
 using the pytorch-lightning framework. To run the script, just run python cycleGAN.py
@@ -68,18 +69,18 @@ class GAN(pl.LightningModule) :
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        self.g_y = self.UNet3D(in_channels=1, out_channels=1, init_features=64)
-        self.g_x = self.UNet3D(in_channels=1, out_channels=1, init_features=64)
+        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=64)
+        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = self.PatchGAN_3D(input_channels=1, out_size=1, n_filters=n)
-        self.d_x = self.PatchGAN_3D(input_channels=1, out_size=1, n_filters=n)
+        self.d_y = PatchGAN_3D(input_channels=1, out_size=1, n_filters=64)
+        self.d_x = PatchGAN_3D(input_channels=1, out_size=1, n_filters=64)
         ### ------------------- ###
 
 
         # Get train and test data sets
         # Import CSV containing DA labels
-        y_df, n_df = load_image_data_frame(csv_path)
+        y_df, n_df = load_image_data_frame(hparams.csv_path)
 
         # Create train and test sets for each DA+ and DA- imgs
         files = load_img_names(hparams.img_dir,
@@ -116,7 +117,7 @@ class GAN(pl.LightningModule) :
                                   file_type="npy",
                                   X_image_centre=self.y_train[:, 0], # DA slice index
                                   Y_image_centre=self.n_train[:, 0], # Mouth slice index
-                                  image_size=[50, 500, 500],
+                                  image_size=[10, 500, 500],
                                   transform=None)
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
@@ -168,16 +169,14 @@ class GAN(pl.LightningModule) :
         gen_x = self.g_x(y)         # Generate fake DA+ images from some real DA- imgs
         gen_y = self.g_y(x)         # Generate fake DA- images from some real DA+ imgs
 
-        # Run discriminator on these generated images
-        d_y_gen_y = self.d_y(gen_y)
-        d_x_gen_x = self.d_x(gen_x)
-
-
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 0 :
             # Forward pass through each discriminator
-            d_y_real = self.d_y(y)
-            d_y_real = self.d_x(x)
+            # Run discriminator on generated images
+            d_y_gen_y = self.d_y(gen_y.detach()).view(-1)
+            d_x_gen_x = self.d_x(gen_x.detach()).view(-1)
+            d_y_real = self.d_y(y).view(-1)
+            d_y_real = self.d_x(x).view(-1)
 
             # Compute loss for each discriminator
             # Put labels on correct GPU
@@ -206,15 +205,19 @@ class GAN(pl.LightningModule) :
 
         ### TRAIN GENERATORS ###
         if optimizer_idx == 1 :
+            # Run discriminator on generated images
+            d_y_gen_y = self.d_y(gen_y).view(-1)
+            d_x_gen_x = self.d_x(gen_x).view(-1)
+
             # Generate fake images from fake images (for cyclical loss)
             gen_x_gen_y = self.g_x(gen_y)
             gen_y_gen_x = self.g_y(gen_x)
 
             # Compute adversarial loss
-            ones  =  ones.cuda(d_y_gen_y.device.index) if self.on_gpu
+            ones = ones.cuda(d_y_gen_y.device.index) if self.on_gpu else ones.cuda()
             loss_Gy = self.mse_loss(d_y_gen_y, ones)
 
-            ones  =  ones.cuda(d_x_gen_x.device.index) if self.on_gpu
+            ones = ones.cuda(d_x_gen_x.device.index) if self.on_gpu else ones.cuda()
             loss_Gx = self.mse_loss(d_x_gen_x, ones)
 
             # Compute cyclic loss
@@ -268,12 +271,12 @@ def main(hparams):
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    logger  = TensorBoardLogger(hparams.logdir, name="DA_Reduction_GAN")
+    logger  = TensorBoardLogger(hparams.log_dir, name="DA_Reduction_GAN")
     logger.log_hyperparams = dontloghparams
     trainer = pl.Trainer(logger=logger, # At the moment, PTL breaks when using builtin logger
                          max_nb_epochs=100,
                          distributed_backend="dp",
-                         gpus=[0]
+                         gpus=0
                          )
 
     # ------------------------
