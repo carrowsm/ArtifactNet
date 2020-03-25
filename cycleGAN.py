@@ -295,7 +295,7 @@ class GAN(pl.LightningModule) :
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
             # Total discriminator loss is the sum of the two
-            D_loss = loss_Dy + loss_Dx.to("cuda:0")
+            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * 2
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -312,11 +312,12 @@ class GAN(pl.LightningModule) :
                 # Generate some fake images to plot
                 gen_y = self.g_y(x.to("cuda:0"))
                 gen_x = self.g_x(y.to("cuda:1"))
-
-                grid = torchvision.utils.make_grid([    x[0, 0, 10, :, :].to("cuda:0"),
-                                                        y[0, 0, 10, :, :].to("cuda:0"),
-                                                    gen_x[0, 0, 10, :, :].to("cuda:0"),
-                                                    gen_y[0, 0, 10, :, :].to("cuda:0")])
+                images = torch.stack([x[0, 0, 10, :, :].to("cuda:0"),
+                                      y[0, 0, 10, :, :].to("cuda:0"),
+                                  gen_x[0, 0, 10, :, :].to("cuda:0"),
+                                  gen_y[0, 0, 10, :, :].to("cuda:0")])
+                images = images.reshape(4, 1, 300, 300)
+                grid = torchvision.utils.make_grid(images)
             self.logger.experiment.add_image(f'imgs/epoch{self.current_epoch}', grid, 0)
         ### ---------------------- ###
 
