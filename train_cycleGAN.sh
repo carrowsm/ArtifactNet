@@ -5,10 +5,10 @@
 #SBATCH -c 10
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
-#SBATCH --partition=veryhimem
-##---#SBATCH --gres=gpu:1
+#SBATCH --partition=gpu_radiomics
+#SBATCH --gres=gpu:2
 #SBATCH --output=DA_removal_GAN.out
-#SBATCH --ntasks-per-node=1
+
 
 
 echo 'Starting Shell Script'

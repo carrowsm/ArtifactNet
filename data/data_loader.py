@@ -386,7 +386,7 @@ class PairedDataset(object):
             raise ValueError(f"Image shape ({z}, {width}, {height}) not accepted by the model.\nData must have z-size 2 or 4.")
 
         # Convert the np.arrays to PyTorch tensors
-        artifact_tensor    = torch.tensor( artifact_arr, dtype=torch.float32)
+        artifact_tensor    = torch.tensor( artifact_arr,    dtype=torch.float32)
         no_artifact_tensor = torch.tensor( no_artifact_arr, dtype=torch.float32)
 
 

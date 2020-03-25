@@ -99,18 +99,18 @@ class PatchGAN_3D(nn.Module) :
                                kernel_size=ks, stride=s, padding=pads, bias=True)
 
         self.convf = nn.Conv3d(in_channels=1, out_channels=1,
-                               kernel_size=[8, 64, 64], stride=s, padding=0, bias=True)
+                               kernel_size=[1, 36, 36], stride=s, padding=0, bias=True)
 
         self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, X) : # Assume X.shape = (N, 1,   50, 512, 512)
-        X = self.conv1(X)                   # (N, 64,  25, 256, 256)
-        X = self.Lrelu(X)                   # (N, 64,  25, 256, 102)
-        X = self.conv2(X)                   # (N, 128, 13, 128, 50)
-        X = self.bnorm(X)                   # (N, 128, 13, 128, 50)
-        X = self.Lrelu(X)                   # (N, 128, 13, 128, 50)
-        X = self.conv3(X)                   # (N, 1,   7,  64,  64)
-
-        X = self.convf(X)                   # (N, 1,   1,   1,   1)
-        X = self.sigmoid(X)
+    def forward(self, X) :
+        # Assume batch_size = N and X.shape = (N,   1, 20, 300, 300)
+        X = self.conv1(X)                   # (N,  64, 10, 150, 150)
+        X = self.Lrelu(X)                   # (N,  64, 10, 150, 150)
+        X = self.conv2(X)                   # (N, 128,  5,  75,  75)
+        X = self.bnorm(X)                   # (N, 128,  5,  75,  75)
+        X = self.Lrelu(X)                   # (N, 128,  5,  75,  75)
+        X = self.conv3(X)                   # (N,   1,  2,  37,  37)
+        X = self.convf(X)                   # (N,   1,  1,   1,   1)
+        X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
         return X

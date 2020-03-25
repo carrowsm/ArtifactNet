@@ -90,7 +90,7 @@ class UNet3D(nn.Module):
         self.bottleneck = self.conv_relu(features * 8, features * 16, name="bottleneck")
 
         ### DECODER ###
-        self.upconv4 = nn.ConvTranspose3d(features * 16, features * 8, kernel_size=2, stride=2)
+        self.upconv4 = nn.ConvTranspose3d(features * 16, features * 8, kernel_size=[3,2,2], stride=2)
         self.decoder4 = self.conv_relu((features * 8) * 2, features * 8, name="dec4")
 
         self.upconv3 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=1, stride=2)
@@ -106,26 +106,29 @@ class UNet3D(nn.Module):
         ### ------- ###
 
     def forward(self, x):
-        enc1 = self.encoder1(x)                            # (N, 64, 300, 300)
-        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 150, 150)
-        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 75, 75)
-        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 38, 38)
+        enc1 = self.encoder1(x)                            # (N, 64, 20, 300, 300)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 10, 150, 150)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 5, 75, 75)
+        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 3, 38, 38)
 
-        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 19, 19)
+        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 1, 19, 19)
 
-        dec4 = self.upconv4(bottleneck)                    # (N, 512, 38, 38)
-        dec4 = torch.cat((dec4, enc4), dim=1)              # (N, 1024, 38, 38)
-        dec4 = self.decoder4(dec4)                         # (N, 512, 38, 38)
-        dec3 = self.upconv3(dec4)                          # (N, 256, 75, 75)
-        dec3 = torch.cat((dec3, enc3), dim=1)              # (N, 512, 75, 75)
-        dec3 = self.decoder3(dec3)                         # (N, 256, 75, 75)
-        dec2 = self.upconv2(dec3)                          # (N, 128, 150, 150)
-        dec2 = torch.cat((dec2, enc2), dim=1)              # (N, 256, 150, 150)
-        dec2 = self.decoder2(dec2)                         # (N, 128, 150, 150)
-        dec1 = self.upconv1(dec2)                          # (N, 64, 300, 300)
-        dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 300, 300)
-        dec1 = self.decoder1(dec1)                         # (N, 64, 300, 300)
-        return torch.sigmoid(self.conv(dec1))              # (N, 1, 300, 300)
+        dec4 = self.upconv4(bottleneck)                    # (N, 512, 3, 38, 38)
+        dec4 = torch.cat((dec4, enc4), dim=1)              # (N, 1024, 3, 38, 38)
+        dec4 = self.decoder4(dec4)                         # (N, 512, 3, 38, 38)
+
+        dec3 = self.upconv3(dec4)                          # (N, 256, 5, 75, 75)
+        dec3 = torch.cat((dec3, enc3), dim=1)              # (N, 512, 5, 75, 75)
+        dec3 = self.decoder3(dec3)                         # (N, 256, 5, 75, 75)
+
+        dec2 = self.upconv2(dec3)                          # (N, 128, 10, 150, 150)
+        dec2 = torch.cat((dec2, enc2), dim=1)              # (N, 256, 10, 150, 150)
+        dec2 = self.decoder2(dec2)                         # (N, 128, 10, 150, 150)
+
+        dec1 = self.upconv1(dec2)                          # (N, 64, 20, 300, 300)
+        dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 20, 300, 300)
+        dec1 = self.decoder1(dec1)                         # (N, 64, 20, 300, 300)
+        return torch.sigmoid(self.conv(dec1))              # (N, 1, 20, 300, 300)
 
     @staticmethod
     def conv_relu(in_channels, features, name):
