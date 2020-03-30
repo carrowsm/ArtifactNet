@@ -255,7 +255,7 @@ class UnpairedDataset(t_data.Dataset):
     def transform(self, X) :
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
-        X = np.clip(X, -1000.0, 1000.0)
+        # X = np.clip(X, -1000.0, 1000.0)
         X = torch.tensor(X, dtype=torch.float32)
         X = self.transforms(X)
         return X
