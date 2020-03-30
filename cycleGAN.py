@@ -228,36 +228,6 @@ class GAN(pl.LightningModule) :
                 G_loss = loss_Gx.to("cuda:0") + loss_cyc2
 
 
-            """
-            print("Computing Adversarial Loss")
-            # Run discriminator on generated images
-            d_y_gen_y = self.d_y(gen_y.to("cuda:0")).view(-1)
-            d_x_gen_x = self.d_x(gen_x.to("cuda:1")).view(-1)
-
-            # Compute adversarial loss
-            loss_Gy = self.adv_loss(d_y_gen_y.to("cuda:2"), ones.to("cuda:2"))
-            loss_Gx = self.adv_loss(d_x_gen_x.to("cuda:2"), ones.to("cuda:2"))
-            G_loss = loss_Gy + loss_Gx
-
-
-            print("Computing Cyclic Loss")
-            # Generate fake images from fake images (for cyclical loss)
-            # print(next(self.g_y.parameters()).device)
-            # print(next(self.g_x.parameters()).device)
-            gen_y = gen_y.to("cuda:2").detach()
-            gen_x = gen_x.to("cuda:3").detach()
-            self.g_x.to("cuda:2")
-            self.g_y.to("cuda:3")
-
-            gen_x_gen_y = self.g_x(gen_y.detach().to("cuda:2")) # fake DA+ from fake DA-
-            gen_y_gen_x = self.g_y(gen_x.detach().to("cuda:3")) # fake DA- from fake DA+
-
-            # Compute cyclic loss
-            loss_cyc1 = self.l1_loss(gen_x_gen_y.to("cuda:2"), x.to("cuda:2"))
-            loss_cyc2 = self.l1_loss(gen_y_gen_x.to("cuda:3"), y.to("cuda:3"))
-            self.g_x.to("cuda:1")
-            self.g_y.to("cuda:0")
-            """
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'g_loss': G_loss}
@@ -325,12 +295,14 @@ class GAN(pl.LightningModule) :
 
     def configure_optimizers(self):
         lr = self.hparams.lr
+        G_lr = lr
+        D_lr = 0.001
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
-                                self.g_y.parameters()), lr=lr, betas=(b1, b2))
+                                self.g_y.parameters()), lr=G_lr, betas=(b1, b2))
         opt_d = torch.optim.Adam(itertools.chain(self.d_x.parameters(),
-                                self.d_y.parameters()), lr=lr, betas=(b1, b2))
+                                self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
         return [opt_g, opt_d], []
 
 

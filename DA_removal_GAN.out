@@ -1,178 +1,0 @@
-Starting Shell Script
-Started python script.
-INFO:root:Set SLURM handle signals.
-INFO:root:
-    | Name                           | Type            | Params
----------------------------------------------------------------
-0   | g_y                            | UNet3D          | 91 M  
-1   | g_y.encoder1                   | Sequential      | 112 K 
-2   | g_y.encoder1.enc1conv1         | Conv3d          | 1 K   
-3   | g_y.encoder1.enc1norm1         | BatchNorm3d     | 128   
-4   | g_y.encoder1.enc1relu1         | LeakyReLU       | 0     
-5   | g_y.encoder1.enc1conv2         | Conv3d          | 110 K 
-6   | g_y.encoder1.enc1norm2         | BatchNorm3d     | 128   
-7   | g_y.encoder1.enc1relu2         | LeakyReLU       | 0     
-8   | g_y.pool1                      | MaxPool3d       | 0     
-9   | g_y.encoder2                   | Sequential      | 664 K 
-10  | g_y.encoder2.enc2conv1         | Conv3d          | 221 K 
-11  | g_y.encoder2.enc2norm1         | BatchNorm3d     | 256   
-12  | g_y.encoder2.enc2relu1         | LeakyReLU       | 0     
-13  | g_y.encoder2.enc2conv2         | Conv3d          | 442 K 
-14  | g_y.encoder2.enc2norm2         | BatchNorm3d     | 256   
-15  | g_y.encoder2.enc2relu2         | LeakyReLU       | 0     
-16  | g_y.pool2                      | MaxPool3d       | 0     
-17  | g_y.encoder3                   | Sequential      | 2 M   
-18  | g_y.encoder3.enc3conv1         | Conv3d          | 884 K 
-19  | g_y.encoder3.enc3norm1         | BatchNorm3d     | 512   
-20  | g_y.encoder3.enc3relu1         | LeakyReLU       | 0     
-21  | g_y.encoder3.enc3conv2         | Conv3d          | 1 M   
-22  | g_y.encoder3.enc3norm2         | BatchNorm3d     | 512   
-23  | g_y.encoder3.enc3relu2         | LeakyReLU       | 0     
-24  | g_y.pool3                      | MaxPool3d       | 0     
-25  | g_y.encoder4                   | Sequential      | 10 M  
-26  | g_y.encoder4.enc4conv1         | Conv3d          | 3 M   
-27  | g_y.encoder4.enc4norm1         | BatchNorm3d     | 1 K   
-28  | g_y.encoder4.enc4relu1         | LeakyReLU       | 0     
-29  | g_y.encoder4.enc4conv2         | Conv3d          | 7 M   
-30  | g_y.encoder4.enc4norm2         | BatchNorm3d     | 1 K   
-31  | g_y.encoder4.enc4relu2         | LeakyReLU       | 0     
-32  | g_y.pool4                      | MaxPool3d       | 0     
-33  | g_y.bottleneck                 | Sequential      | 42 M  
-34  | g_y.bottleneck.bottleneckconv1 | Conv3d          | 14 M  
-35  | g_y.bottleneck.bottlenecknorm1 | BatchNorm3d     | 2 K   
-36  | g_y.bottleneck.bottleneckrelu1 | LeakyReLU       | 0     
-37  | g_y.bottleneck.bottleneckconv2 | Conv3d          | 28 M  
-38  | g_y.bottleneck.bottlenecknorm2 | BatchNorm3d     | 2 K   
-39  | g_y.bottleneck.bottleneckrelu2 | LeakyReLU       | 0     
-40  | g_y.upconv4                    | ConvTranspose3d | 6 M   
-41  | g_y.decoder4                   | Sequential      | 21 M  
-42  | g_y.decoder4.dec4conv1         | Conv3d          | 14 M  
-43  | g_y.decoder4.dec4norm1         | BatchNorm3d     | 1 K   
-44  | g_y.decoder4.dec4relu1         | LeakyReLU       | 0     
-45  | g_y.decoder4.dec4conv2         | Conv3d          | 7 M   
-46  | g_y.decoder4.dec4norm2         | BatchNorm3d     | 1 K   
-47  | g_y.decoder4.dec4relu2         | LeakyReLU       | 0     
-48  | g_y.upconv3                    | ConvTranspose3d | 131 K 
-49  | g_y.decoder3                   | Sequential      | 5 M   
-50  | g_y.decoder3.dec3conv1         | Conv3d          | 3 M   
-51  | g_y.decoder3.dec3norm1         | BatchNorm3d     | 512   
-52  | g_y.decoder3.dec3relu1         | LeakyReLU       | 0     
-53  | g_y.decoder3.dec3conv2         | Conv3d          | 1 M   
-54  | g_y.decoder3.dec3norm2         | BatchNorm3d     | 512   
-55  | g_y.decoder3.dec3relu2         | LeakyReLU       | 0     
-56  | g_y.upconv2                    | ConvTranspose3d | 262 K 
-57  | g_y.decoder2                   | Sequential      | 1 M   
-58  | g_y.decoder2.dec2conv1         | Conv3d          | 884 K 
-59  | g_y.decoder2.dec2norm1         | BatchNorm3d     | 256   
-60  | g_y.decoder2.dec2relu1         | LeakyReLU       | 0     
-61  | g_y.decoder2.dec2conv2         | Conv3d          | 442 K 
-62  | g_y.decoder2.dec2norm2         | BatchNorm3d     | 256   
-63  | g_y.decoder2.dec2relu2         | LeakyReLU       | 0     
-64  | g_y.upconv1                    | ConvTranspose3d | 65 K  
-65  | g_y.decoder1                   | Sequential      | 332 K 
-66  | g_y.decoder1.dec1conv1         | Conv3d          | 221 K 
-67  | g_y.decoder1.dec1norm1         | BatchNorm3d     | 128   
-68  | g_y.decoder1.dec1relu1         | LeakyReLU       | 0     
-69  | g_y.decoder1.dec1conv2         | Conv3d          | 110 K 
-70  | g_y.decoder1.dec1norm2         | BatchNorm3d     | 128   
-71  | g_y.decoder1.dec1relu2         | LeakyReLU       | 0     
-72  | g_y.conv                       | Conv3d          | 65    
-73  | g_x                            | UNet3D          | 91 M  
-74  | g_x.encoder1                   | Sequential      | 112 K 
-75  | g_x.encoder1.enc1conv1         | Conv3d          | 1 K   
-76  | g_x.encoder1.enc1norm1         | BatchNorm3d     | 128   
-77  | g_x.encoder1.enc1relu1         | LeakyReLU       | 0     
-78  | g_x.encoder1.enc1conv2         | Conv3d          | 110 K 
-79  | g_x.encoder1.enc1norm2         | BatchNorm3d     | 128   
-80  | g_x.encoder1.enc1relu2         | LeakyReLU       | 0     
-81  | g_x.pool1                      | MaxPool3d       | 0     
-82  | g_x.encoder2                   | Sequential      | 664 K 
-83  | g_x.encoder2.enc2conv1         | Conv3d          | 221 K 
-84  | g_x.encoder2.enc2norm1         | BatchNorm3d     | 256   
-85  | g_x.encoder2.enc2relu1         | LeakyReLU       | 0     
-86  | g_x.encoder2.enc2conv2         | Conv3d          | 442 K 
-87  | g_x.encoder2.enc2norm2         | BatchNorm3d     | 256   
-88  | g_x.encoder2.enc2relu2         | LeakyReLU       | 0     
-89  | g_x.pool2                      | MaxPool3d       | 0     
-90  | g_x.encoder3                   | Sequential      | 2 M   
-91  | g_x.encoder3.enc3conv1         | Conv3d          | 884 K 
-92  | g_x.encoder3.enc3norm1         | BatchNorm3d     | 512   
-93  | g_x.encoder3.enc3relu1         | LeakyReLU       | 0     
-94  | g_x.encoder3.enc3conv2         | Conv3d          | 1 M   
-95  | g_x.encoder3.enc3norm2         | BatchNorm3d     | 512   
-96  | g_x.encoder3.enc3relu2         | LeakyReLU       | 0     
-97  | g_x.pool3                      | MaxPool3d       | 0     
-98  | g_x.encoder4                   | Sequential      | 10 M  
-99  | g_x.encoder4.enc4conv1         | Conv3d          | 3 M   
-100 | g_x.encoder4.enc4norm1         | BatchNorm3d     | 1 K   
-101 | g_x.encoder4.enc4relu1         | LeakyReLU       | 0     
-102 | g_x.encoder4.enc4conv2         | Conv3d          | 7 M   
-103 | g_x.encoder4.enc4norm2         | BatchNorm3d     | 1 K   
-104 | g_x.encoder4.enc4relu2         | LeakyReLU       | 0     
-105 | g_x.pool4                      | MaxPool3d       | 0     
-106 | g_x.bottleneck                 | Sequential      | 42 M  
-107 | g_x.bottleneck.bottleneckconv1 | Conv3d          | 14 M  
-108 | g_x.bottleneck.bottlenecknorm1 | BatchNorm3d     | 2 K   
-109 | g_x.bottleneck.bottleneckrelu1 | LeakyReLU       | 0     
-110 | g_x.bottleneck.bottleneckconv2 | Conv3d          | 28 M  
-111 | g_x.bottleneck.bottlenecknorm2 | BatchNorm3d     | 2 K   
-112 | g_x.bottleneck.bottleneckrelu2 | LeakyReLU       | 0     
-113 | g_x.upconv4                    | ConvTranspose3d | 6 M   
-114 | g_x.decoder4                   | Sequential      | 21 M  
-115 | g_x.decoder4.dec4conv1         | Conv3d          | 14 M  
-116 | g_x.decoder4.dec4norm1         | BatchNorm3d     | 1 K   
-117 | g_x.decoder4.dec4relu1         | LeakyReLU       | 0     
-118 | g_x.decoder4.dec4conv2         | Conv3d          | 7 M   
-119 | g_x.decoder4.dec4norm2         | BatchNorm3d     | 1 K   
-120 | g_x.decoder4.dec4relu2         | LeakyReLU       | 0     
-121 | g_x.upconv3                    | ConvTranspose3d | 131 K 
-122 | g_x.decoder3                   | Sequential      | 5 M   
-123 | g_x.decoder3.dec3conv1         | Conv3d          | 3 M   
-124 | g_x.decoder3.dec3norm1         | BatchNorm3d     | 512   
-125 | g_x.decoder3.dec3relu1         | LeakyReLU       | 0     
-126 | g_x.decoder3.dec3conv2         | Conv3d          | 1 M   
-127 | g_x.decoder3.dec3norm2         | BatchNorm3d     | 512   
-128 | g_x.decoder3.dec3relu2         | LeakyReLU       | 0     
-129 | g_x.upconv2                    | ConvTranspose3d | 262 K 
-130 | g_x.decoder2                   | Sequential      | 1 M   
-131 | g_x.decoder2.dec2conv1         | Conv3d          | 884 K 
-132 | g_x.decoder2.dec2norm1         | BatchNorm3d     | 256   
-133 | g_x.decoder2.dec2relu1         | LeakyReLU       | 0     
-134 | g_x.decoder2.dec2conv2         | Conv3d          | 442 K 
-135 | g_x.decoder2.dec2norm2         | BatchNorm3d     | 256   
-136 | g_x.decoder2.dec2relu2         | LeakyReLU       | 0     
-137 | g_x.upconv1                    | ConvTranspose3d | 65 K  
-138 | g_x.decoder1                   | Sequential      | 332 K 
-139 | g_x.decoder1.dec1conv1         | Conv3d          | 221 K 
-140 | g_x.decoder1.dec1norm1         | BatchNorm3d     | 128   
-141 | g_x.decoder1.dec1relu1         | LeakyReLU       | 0     
-142 | g_x.decoder1.dec1conv2         | Conv3d          | 110 K 
-143 | g_x.decoder1.dec1norm2         | BatchNorm3d     | 128   
-144 | g_x.decoder1.dec1relu2         | LeakyReLU       | 0     
-145 | g_x.conv                       | Conv3d          | 65    
-146 | d_y                            | PatchGAN_3D     | 538 K 
-147 | d_y.conv1                      | Conv3d          | 4 K   
-148 | d_y.Lrelu                      | LeakyReLU       | 0     
-149 | d_y.conv2                      | Conv3d          | 524 K 
-150 | d_y.bnorm                      | BatchNorm3d     | 256   
-151 | d_y.conv3                      | Conv3d          | 8 K   
-152 | d_y.convf                      | Conv3d          | 1 K   
-153 | d_y.sigmoid                    | Sigmoid         | 0     
-154 | d_x                            | PatchGAN_3D     | 538 K 
-155 | d_x.conv1                      | Conv3d          | 4 K   
-156 | d_x.Lrelu                      | LeakyReLU       | 0     
-157 | d_x.conv2                      | Conv3d          | 524 K 
-158 | d_x.bnorm                      | BatchNorm3d     | 256   
-159 | d_x.conv3                      | Conv3d          | 8 K   
-160 | d_x.convf                      | Conv3d          | 1 K   
-161 | d_x.sigmoid                    | Sigmoid         | 0     
-162 | l1_loss                        | L1Loss          | 0     
-163 | adv_loss                       | MSELoss         | 0     
-2 GPUs are available
-### Device 0: ###
-Name:  Tesla P100-PCIE-12GB
-Memory allocated:  371276800
-### Device 1: ###
-Name:  Tesla P100-PCIE-12GB
-Memory allocated:  371276800
-0it [00:00, ?it/s]  0%|          | 0/967 [00:00<?, ?it/s]Epoch 1:   0%|          | 0/967 [00:00<?, ?it/s]Epoch 1:   0%|          | 1/967 [00:11<3:08:11, 11.69s/it]Epoch 1:   0%|          | 1/967 [00:11<3:08:11, 11.69s/it, d_loss=2.81, g_loss=780, loss=391.384, v_num=6]Epoch 1:   0%|          | 2/967 [00:15<2:31:07,  9.40s/it, d_loss=2.81, g_loss=780, loss=391.384, v_num=6]Epoch 1:   0%|          | 2/967 [00:15<2:31:07,  9.40s/it, d_loss=1.18, g_loss=776, loss=389.898, v_num=6]Epoch 1:   0%|          | 3/967 [00:19<2:05:21,  7.80s/it, d_loss=1.18, g_loss=776, loss=389.898, v_num=6]Epoch 1:   0%|          | 3/967 [00:19<2:05:21,  7.80s/it, d_loss=0.566, g_loss=764, loss=387.392, v_num=6]Epoch 1:   0%|          | 4/967 [00:23<1:47:07,  6.67s/it, d_loss=0.566, g_loss=764, loss=387.392, v_num=6]Epoch 1:   0%|          | 4/967 [00:23<1:47:07,  6.67s/it, d_loss=0.0396, g_loss=776, loss=387.519, v_num=6]Epoch 1:   1%|          | 5/967 [00:27<1:34:29,  5.89s/it, d_loss=0.0396, g_loss=776, loss=387.519, v_num=6]Epoch 1:   1%|          | 5/967 [00:27<1:34:29,  5.89s/it, d_loss=0.021, g_loss=739, loss=383.935, v_num=6] Epoch 1:   1%|          | 6/967 [00:31<1:25:30,  5.34s/it, d_loss=0.021, g_loss=739, loss=383.935, v_num=6]Epoch 1:   1%|          | 6/967 [00:31<1:25:30,  5.34s/it, d_loss=0.0314, g_loss=776, loss=384.587, v_num=6]Epoch 1:   1%|          | 7/967 [00:36<1:19:18,  4.96s/it, d_loss=0.0314, g_loss=776, loss=384.587, v_num=6]Epoch 1:   1%|          | 7/967 [00:36<1:19:18,  4.96s/it, d_loss=0.0169, g_loss=713, loss=380.607, v_num=6]Epoch 1:   1%|          | 8/967 [00:40<1:14:51,  4.68s/it, d_loss=0.0169, g_loss=713, loss=380.607, v_num=6]Epoch 1:   1%|          | 8/967 [00:40<1:14:51,  4.68s/it, d_loss=0.0412, g_loss=776, loss=381.509, v_num=6]Epoch 1:   1%|          | 9/967 [00:44<1:11:48,  4.50s/it, d_loss=0.0412, g_loss=776, loss=381.509, v_num=6]Epoch 1:   1%|          | 9/967 [00:44<1:11:48,  4.50s/it, d_loss=0.0111, g_loss=743, loss=380.372, v_num=6]Epoch 1:   1%|          | 10/967 [00:48<1:09:32,  4.36s/it, d_loss=0.0111, g_loss=743, loss=380.372, v_num=6]Epoch 1:   1%|          | 10/967 [00:48<1:09:32,  4.36s/it, d_loss=0.0181, g_loss=776, loss=381.117, v_num=6]Epoch 1:   1%|          | 11/967 [00:52<1:08:02,  4.27s/it, d_loss=0.0181, g_loss=776, loss=381.117, v_num=6]Epoch 1:   1%|          | 11/967 [00:52<1:08:02,  4.27s/it, d_loss=0.0682, g_loss=733, loss=379.790, v_num=6]Epoch 1:   1%|          | 12/967 [00:56<1:06:55,  4.20s/it, d_loss=0.0682, g_loss=733, loss=379.790, v_num=6]Epoch 1:   1%|          | 12/967 [00:56<1:06:55,  4.20s/it, d_loss=0.0668, g_loss=735, loss=378.780, v_num=6]Epoch 1:   1%|▏         | 13/967 [01:00<1:06:10,  4.16s/it, d_loss=0.0668, g_loss=735, loss=378.780, v_num=6]Epoch 1:   1%|▏         | 13/967 [01:00<1:06:10,  4.16s/it, d_loss=0.00472, g_loss=747, loss=378.356, v_num=6]Epoch 1:   1%|▏         | 14/967 [01:04<1:05:31,  4.13s/it, d_loss=0.00472, g_loss=747, loss=378.356, v_num=6]Epoch 1:   1%|▏         | 14/967 [01:04<1:05:31,  4.13s/it, d_loss=0.0177, g_loss=735, loss=377.591, v_num=6] Epoch 1:   2%|▏         | 15/967 [01:08<1:05:09,  4.11s/it, d_loss=0.0177, g_loss=735, loss=377.591, v_num=6]Epoch 1:   2%|▏         | 15/967 [01:08<1:05:09,  4.11s/it, d_loss=0.000927, g_loss=774, loss=378.203, v_num=6]Epoch 1:   2%|▏         | 16/967 [01:12<1:04:47,  4.09s/it, d_loss=0.000927, g_loss=774, loss=378.203, v_num=6]Epoch 1:   2%|▏         | 16/967 [01:12<1:04:47,  4.09s/it, d_loss=0.00308, g_loss=735, loss=377.544, v_num=6] Epoch 1:   2%|▏         | 17/967 [01:16<1:04:35,  4.08s/it, d_loss=0.00308, g_loss=735, loss=377.544, v_num=6]Epoch 1:   2%|▏         | 17/967 [01:16<1:04:35,  4.08s/it, d_loss=0.00163, g_loss=805, loss=379.014, v_num=6]Epoch 1:   2%|▏         | 18/967 [01:20<1:04:20,  4.07s/it, d_loss=0.00163, g_loss=805, loss=379.014, v_num=6]Epoch 1:   2%|▏         | 18/967 [01:20<1:04:20,  4.07s/it, d_loss=0.0195, g_loss=735, loss=378.383, v_num=6] Epoch 1:   2%|▏         | 19/967 [01:24<1:04:15,  4.07s/it, d_loss=0.0195, g_loss=735, loss=378.383, v_num=6]Epoch 1:   2%|▏         | 19/967 [01:24<1:04:15,  4.07s/it, d_loss=0.00118, g_loss=714, loss=377.269, v_num=6]Epoch 1:   2%|▏         | 20/967 [01:28<1:04:04,  4.06s/it, d_loss=0.00118, g_loss=714, loss=377.269, v_num=6]Epoch 1:   2%|▏         | 20/967 [01:28<1:04:04,  4.06s/it, d_loss=0.0014, g_loss=735, loss=376.788, v_num=6] Epoch 1:   2%|▏         | 21/967 [01:32<1:04:01,  4.06s/it, d_loss=0.0014, g_loss=735, loss=376.788, v_num=6]Epoch 1:   2%|▏         | 21/967 [01:32<1:04:01,  4.06s/it, d_loss=0.00254, g_loss=742, loss=376.508, v_num=6]Epoch 1:   2%|▏         | 22/967 [01:36<1:03:54,  4.06s/it, d_loss=0.00254, g_loss=742, loss=376.508, v_num=6]Epoch 1:   2%|▏         | 22/967 [01:36<1:03:54,  4.06s/it, d_loss=0.00367, g_loss=804, loss=377.671, v_num=6]Epoch 1:   2%|▏         | 23/967 [01:40<1:03:51,  4.06s/it, d_loss=0.00367, g_loss=804, loss=377.671, v_num=6]Epoch 1:   2%|▏         | 23/967 [01:40<1:03:51,  4.06s/it, d_loss=0.000652, g_loss=746, loss=377.475, v_num=6]Epoch 1:   2%|▏         | 24/967 [01:44<1:03:42,  4.05s/it, d_loss=0.000652, g_loss=746, loss=377.475, v_num=6]Epoch 1:   2%|▏         | 24/967 [01:44<1:03:42,  4.05s/it, d_loss=0.00987, g_loss=804, loss=378.501, v_num=6] Epoch 1:   3%|▎         | 25/967 [01:48<1:03:40,  4.06s/it, d_loss=0.00987, g_loss=804, loss=378.501, v_num=6]Epoch 1:   3%|▎         | 25/967 [01:49<1:03:40,  4.06s/it, d_loss=0.00111, g_loss=750, loss=378.356, v_num=6]Epoch 1:   3%|▎         | 26/967 [01:53<1:03:32,  4.05s/it, d_loss=0.00111, g_loss=750, loss=378.356, v_num=6]Epoch 1:   3%|▎         | 26/967 [01:53<1:03:32,  4.05s/it, d_loss=0.00329, g_loss=804, loss=379.269, v_num=6]Epoch 1:   3%|▎         | 27/967 [01:57<1:03:31,  4.06s/it, d_loss=0.00329, g_loss=804, loss=379.269, v_num=6]Epoch 1:   3%|▎         | 27/967 [01:57<1:03:31,  4.06s/it, d_loss=0.000957, g_loss=729, loss=378.718, v_num=6]Epoch 1:   3%|▎         | 28/967 [02:01<1:03:23,  4.05s/it, d_loss=0.000957, g_loss=729, loss=378.718, v_num=6]Epoch 1:   3%|▎         | 28/967 [02:01<1:03:23,  4.05s/it, d_loss=0.00553, g_loss=804, loss=379.553, v_num=6] Epoch 1:   3%|▎         | 29/967 [02:05<1:03:22,  4.05s/it, d_loss=0.00553, g_loss=804, loss=379.553, v_num=6]Epoch 1:   3%|▎         | 29/967 [02:05<1:03:22,  4.05s/it, d_loss=0.000302, g_loss=762, loss=379.604, v_num=6]Epoch 1:   3%|▎         | 30/967 [02:09<1:03:15,  4.05s/it, d_loss=0.000302, g_loss=762, loss=379.604, v_num=6]Epoch 1:   3%|▎         | 30/967 [02:09<1:03:15,  4.05s/it, d_loss=0.000476, g_loss=804, loss=380.354, v_num=6]Epoch 1:   3%|▎         | 31/967 [02:13<1:03:15,  4.05s/it, d_loss=0.000476, g_loss=804, loss=380.354, v_num=6]Epoch 1:   3%|▎         | 31/967 [02:13<1:03:15,  4.05s/it, d_loss=0.0361, g_loss=723, loss=379.741, v_num=6]  Epoch 1:   3%|▎         | 32/967 [02:17<1:03:10,  4.05s/it, d_loss=0.0361, g_loss=723, loss=379.741, v_num=6]Epoch 1:   3%|▎         | 32/967 [02:17<1:03:10,  4.05s/it, d_loss=0.0029, g_loss=700, loss=378.818, v_num=6]Epoch 1:   3%|▎         | 33/967 [02:21<1:03:08,  4.06s/it, d_loss=0.0029, g_loss=700, loss=378.818, v_num=6]Epoch 1:   3%|▎         | 33/967 [02:21<1:03:08,  4.06s/it, d_loss=0.00875, g_loss=717, loss=378.202, v_num=6]Epoch 1:   4%|▎         | 34/967 [02:25<1:03:00,  4.05s/it, d_loss=0.00875, g_loss=717, loss=378.202, v_num=6]Epoch 1:   4%|▎         | 34/967 [02:25<1:03:00,  4.05s/it, d_loss=0.00037, g_loss=700, loss=377.379, v_num=6]Epoch 1:   4%|▎         | 35/967 [02:29<1:02:58,  4.05s/it, d_loss=0.00037, g_loss=700, loss=377.379, v_num=6]Epoch 1:   4%|▎         | 35/967 [02:29<1:02:58,  4.05s/it, d_loss=0.000352, g_loss=680, loss=376.312, v_num=6]Epoch 1:   4%|▎         | 36/967 [02:33<1:02:52,  4.05s/it, d_loss=0.000352, g_loss=680, loss=376.312, v_num=6]Epoch 1:   4%|▎         | 36/967 [02:33<1:02:52,  4.05s/it, d_loss=0.000224, g_loss=700, loss=375.586, v_num=6]Epoch 1:   4%|▍         | 37/967 [02:37<1:02:51,  4.06s/it, d_loss=0.000224, g_loss=700, loss=375.586, v_num=6]Epoch 1:   4%|▍         | 37/967 [02:37<1:02:51,  4.06s/it, d_loss=0.000251, g_loss=699, loss=374.877, v_num=6]Epoch 1:   4%|▍         | 38/967 [02:41<1:02:43,  4.05s/it, d_loss=0.000251, g_loss=699, loss=374.877, v_num=6]Epoch 1:   4%|▍         | 38/967 [02:41<1:02:43,  4.05s/it, d_loss=0.000285, g_loss=700, loss=374.228, v_num=6]Epoch 1:   4%|▍         | 39/967 [02:45<1:02:42,  4.05s/it, d_loss=0.000285, g_loss=700, loss=374.228, v_num=6]Epoch 1:   4%|▍         | 39/967 [02:45<1:02:42,  4.05s/it, d_loss=0.00726, g_loss=759, loss=374.366, v_num=6] Epoch 1:   4%|▍         | 40/967 [02:49<1:02:34,  4.05s/it, d_loss=0.00726, g_loss=759, loss=374.366, v_num=6]Epoch 1:   4%|▍         | 40/967 [02:49<1:02:34,  4.05s/it, d_loss=0.000455, g_loss=700, loss=373.762, v_num=6]Epoch 1:   4%|▍         | 41/967 [02:53<1:02:33,  4.05s/it, d_loss=0.000455, g_loss=700, loss=373.762, v_num=6]Epoch 1:   4%|▍         | 41/967 [02:53<1:02:33,  4.05s/it, d_loss=0.00173, g_loss=763, loss=373.947, v_num=6] Epoch 1:   4%|▍         | 42/967 [02:57<1:02:28,  4.05s/it, d_loss=0.00173, g_loss=763, loss=373.947, v_num=6]Epoch 1:   4%|▍         | 42/967 [02:57<1:02:28,  4.05s/it, d_loss=0.000768, g_loss=658, loss=372.877, v_num=6]Epoch 1:   4%|▍         | 43/967 [03:01<1:02:27,  4.06s/it, d_loss=0.000768, g_loss=658, loss=372.877, v_num=6]Epoch 1:   4%|▍         | 43/967 [03:01<1:02:27,  4.06s/it, d_loss=0.00415, g_loss=790, loss=373.388, v_num=6] Epoch 1:   5%|▍         | 44/967 [03:05<1:02:19,  4.05s/it, d_loss=0.00415, g_loss=790, loss=373.388, v_num=6]Epoch 1:   5%|▍         | 44/967 [03:05<1:02:19,  4.05s/it, d_loss=0.00349, g_loss=658, loss=372.380, v_num=6]Epoch 1:   5%|▍         | 45/967 [03:10<1:02:18,  4.06s/it, d_loss=0.00349, g_loss=658, loss=372.380, v_num=6]Epoch 1:   5%|▍         | 45/967 [03:10<1:02:18,  4.06s/it, d_loss=0.000867, g_loss=731, loss=372.223, v_num=6]Epoch 1:   5%|▍         | 46/967 [03:14<1:02:12,  4.05s/it, d_loss=0.000867, g_loss=731, loss=372.223, v_num=6]Epoch 1:   5%|▍         | 46/967 [03:14<1:02:12,  4.05s/it, d_loss=0.00049, g_loss=658, loss=371.284, v_num=6] Epoch 1:   5%|▍         | 47/967 [03:18<1:02:14,  4.06s/it, d_loss=0.00049, g_loss=658, loss=371.284, v_num=6]Epoch 1:   5%|▍         | 47/967 [03:18<1:02:14,  4.06s/it, d_loss=0.000453, g_loss=764, loss=371.515, v_num=6]Epoch 1:   5%|▍         | 48/967 [03:22<1:02:05,  4.05s/it, d_loss=0.000453, g_loss=764, loss=371.515, v_num=6]Epoch 1:   5%|▍         | 48/967 [03:22<1:02:05,  4.05s/it, d_loss=0.000977, g_loss=658, loss=370.629, v_num=6]Epoch 1:   5%|▌         | 49/967 [03:26<1:02:03,  4.06s/it, d_loss=0.000977, g_loss=658, loss=370.629, v_num=6]Epoch 1:   5%|▌         | 49/967 [03:26<1:02:03,  4.06s/it, d_loss=0.000832, g_loss=727, loss=370.480, v_num=6]Epoch 1:   5%|▌         | 50/967 [03:30<1:01:55,  4.05s/it, d_loss=0.000832, g_loss=727, loss=370.480, v_num=6]Epoch 1:   5%|▌         | 50/967 [03:30<1:01:55,  4.05s/it, d_loss=0.000341, g_loss=658, loss=369.651, v_num=6]Epoch 1:   5%|▌         | 51/967 [03:34<1:01:54,  4.06s/it, d_loss=0.000341, g_loss=658, loss=369.651, v_num=6]Epoch 1:   5%|▌         | 51/967 [03:34<1:01:54,  4.06s/it, d_loss=0.000296, g_loss=711, loss=368.931, v_num=6]Epoch 1:   5%|▌         | 52/967 [03:38<1:01:49,  4.05s/it, d_loss=0.000296, g_loss=711, loss=368.931, v_num=6]Epoch 1:   5%|▌         | 52/967 [03:38<1:01:49,  4.05s/it, d_loss=0.00222, g_loss=754, loss=368.702, v_num=6] Epoch 1:   5%|▌         | 53/967 [03:42<1:01:48,  4.06s/it, d_loss=0.00222, g_loss=754, loss=368.702, v_num=6]Epoch 1:   5%|▌         | 53/967 [03:42<1:01:48,  4.06s/it, d_loss=2.88e-5, g_loss=737, loss=368.423, v_num=6]Epoch 1:   6%|▌         | 54/967 [03:46<1:01:40,  4.05s/it, d_loss=2.88e-5, g_loss=737, loss=368.423, v_num=6]Epoch 1:   6%|▌         | 54/967 [03:46<1:01:40,  4.05s/it, d_loss=0.000102, g_loss=754, loss=368.204, v_num=6]Epoch 1:   6%|▌         | 55/967 [03:50<1:01:39,  4.06s/it, d_loss=0.000102, g_loss=754, loss=368.204, v_num=6]Epoch 1:   6%|▌         | 55/967 [03:50<1:01:39,  4.06s/it, d_loss=0.00118, g_loss=745, loss=368.260, v_num=6] Epoch 1:   6%|▌         | 56/967 [03:54<1:01:32,  4.05s/it, d_loss=0.00118, g_loss=745, loss=368.260, v_num=6]Epoch 1:   6%|▌         | 56/967 [03:54<1:01:32,  4.05s/it, d_loss=0.000247, g_loss=754, loss=368.042, v_num=6]Epoch 1:   6%|▌         | 57/967 [03:58<1:01:31,  4.06s/it, d_loss=0.000247, g_loss=754, loss=368.042, v_num=6]Epoch 1:   6%|▌         | 57/967 [03:58<1:01:31,  4.06s/it, d_loss=0.0019, g_loss=769, loss=368.599, v_num=6]  Epoch 1:   6%|▌         | 58/967 [04:02<1:01:23,  4.05s/it, d_loss=0.0019, g_loss=769, loss=368.599, v_num=6]Epoch 1:   6%|▌         | 58/967 [04:02<1:01:23,  4.05s/it, d_loss=8.26e-5, g_loss=754, loss=368.382, v_num=6]Epoch 1:   6%|▌         | 59/967 [04:06<1:01:21,  4.05s/it, d_loss=8.26e-5, g_loss=754, loss=368.382, v_num=6]Epoch 1:   6%|▌         | 59/967 [04:06<1:01:21,  4.05s/it, d_loss=0.000129, g_loss=713, loss=368.087, v_num=6]Epoch 1:   6%|▌         | 60/967 [04:10<1:01:14,  4.05s/it, d_loss=0.000129, g_loss=713, loss=368.087, v_num=6]Epoch 1:   6%|▌         | 60/967 [04:10<1:01:14,  4.05s/it, d_loss=2.27e-5, g_loss=754, loss=367.869, v_num=6] Epoch 1:   6%|▋         | 61/967 [04:14<1:01:14,  4.06s/it, d_loss=2.27e-5, g_loss=754, loss=367.869, v_num=6]Epoch 1:   6%|▋         | 61/967 [04:14<1:01:14,  4.06s/it, d_loss=1.84e-5, g_loss=721, loss=367.752, v_num=6]Epoch 1:   6%|▋         | 62/967 [04:18<1:01:08,  4.05s/it, d_loss=1.84e-5, g_loss=721, loss=367.752, v_num=6]Epoch 1:   6%|▋         | 62/967 [04:18<1:01:08,  4.05s/it, d_loss=5.55e-5, g_loss=797, loss=368.363, v_num=6]Epoch 1:   7%|▋         | 63/967 [04:23<1:01:07,  4.06s/it, d_loss=5.55e-5, g_loss=797, loss=368.363, v_num=6]Epoch 1:   7%|▋         | 63/967 [04:23<1:01:07,  4.06s/it, d_loss=7.27e-5, g_loss=720, loss=368.101, v_num=6]Epoch 1:   7%|▋         | 64/967 [04:27<1:01:02,  4.06s/it, d_loss=7.27e-5, g_loss=720, loss=368.101, v_num=6]Epoch 1:   7%|▋         | 64/967 [04:27<1:01:02,  4.06s/it, d_loss=5.57e-6, g_loss=797, loss=368.713, v_num=6]Epoch 1:   7%|▋         | 65/967 [04:31<1:01:03,  4.06s/it, d_loss=5.57e-6, g_loss=797, loss=368.713, v_num=6]Epoch 1:   7%|▋         | 65/967 [04:31<1:01:03,  4.06s/it, d_loss=9.85e-6, g_loss=763, loss=368.611, v_num=6]Epoch 1:   7%|▋         | 66/967 [04:35<1:00:54,  4.06s/it, d_loss=9.85e-6, g_loss=763, loss=368.611, v_num=6]Epoch 1:   7%|▋         | 66/967 [04:35<1:00:54,  4.06s/it, d_loss=1.04e-5, g_loss=797, loss=369.223, v_num=6]Epoch 1:   7%|▋         | 67/967 [04:39<1:00:51,  4.06s/it, d_loss=1.04e-5, g_loss=797, loss=369.223, v_num=6]Epoch 1:   7%|▋         | 67/967 [04:39<1:00:51,  4.06s/it, d_loss=4.75e-6, g_loss=798, loss=369.149, v_num=6]Epoch 1:   7%|▋         | 68/967 [04:43<1:00:43,  4.05s/it, d_loss=4.75e-6, g_loss=798, loss=369.149, v_num=6]Epoch 1:   7%|▋         | 68/967 [04:43<1:00:43,  4.05s/it, d_loss=1.32e-5, g_loss=797, loss=369.761, v_num=6]Epoch 1:   7%|▋         | 69/967 [04:47<1:00:42,  4.06s/it, d_loss=1.32e-5, g_loss=797, loss=369.761, v_num=6]Epoch 1:   7%|▋         | 69/967 [04:47<1:00:42,  4.06s/it, d_loss=2.17e-5, g_loss=717, loss=369.787, v_num=6]Epoch 1:   7%|▋         | 70/967 [04:51<1:00:34,  4.05s/it, d_loss=2.17e-5, g_loss=717, loss=369.787, v_num=6]Epoch 1:   7%|▋         | 70/967 [04:51<1:00:34,  4.05s/it, d_loss=8.34e-6, g_loss=797, loss=370.399, v_num=6]Epoch 1:   7%|▋         | 71/967 [04:55<1:00:33,  4.06s/it, d_loss=8.34e-6, g_loss=797, loss=370.399, v_num=6]Epoch 1:   7%|▋         | 71/967 [04:55<1:00:33,  4.06s/it, d_loss=1.59e-5, g_loss=716, loss=370.139, v_num=6]Epoch 1:   7%|▋         | 72/967 [04:59<1:00:28,  4.05s/it, d_loss=1.59e-5, g_loss=716, loss=370.139, v_num=6]Epoch 1:   7%|▋         | 72/967 [04:59<1:00:28,  4.05s/it, d_loss=1.5e-5, g_loss=817, loss=370.265, v_num=6] Epoch 1:   8%|▊         | 73/967 [05:03<1:00:26,  4.06s/it, d_loss=1.5e-5, g_loss=817, loss=370.265, v_num=6]Epoch 1:   8%|▊         | 73/967 [05:03<1:00:26,  4.06s/it, d_loss=1.79e-5, g_loss=711, loss=369.915, v_num=6]Epoch 1:   8%|▊         | 74/967 [05:07<1:00:18,  4.05s/it, d_loss=1.79e-5, g_loss=711, loss=369.915, v_num=6]Epoch 1:   8%|▊         | 74/967 [05:07<1:00:18,  4.05s/it, d_loss=1.05e-5, g_loss=817, loss=370.041, v_num=6]Epoch 1:   8%|▊         | 75/967 [05:11<1:00:17,  4.06s/it, d_loss=1.05e-5, g_loss=817, loss=370.041, v_num=6]Epoch 1:   8%|▊         | 75/967 [05:11<1:00:17,  4.06s/it, d_loss=2, g_loss=879, loss=371.350, v_num=6]      
