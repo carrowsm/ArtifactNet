@@ -129,10 +129,8 @@ class GAN(pl.LightningModule) :
 
     @pl.data_loader
     def train_dataloader(self):
-        # Load transforms
-        # transform = transforms.Compose([transforms.ToTensor(),
-        #                                 transforms.Normalize([0.5], [0.5])])
 
+        self.image_size = [20, 300, 300]
 
         # Test data loader
         dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
@@ -140,11 +138,12 @@ class GAN(pl.LightningModule) :
                                   file_type="npy",
                                   X_image_centre=self.y_train[:, 0], # DA slice index
                                   Y_image_centre=self.n_train[:, 0], # Mouth slice index
-                                  image_size=[20, 300, 300],
+                                  image_size=self.image_size,
                                   transform=None)
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=10)
+                                 shuffle=True, num_workers=0
+                                 )
 
         return data_loader
 
@@ -199,8 +198,9 @@ class GAN(pl.LightningModule) :
                 # Generate fake images from fake images (for cyclical loss)
                 gen_x_gen_y = self.g_x(gen_y.to("cuda:1")) # fake DA+ from fake DA-
 
-                # Compute cyclic loss
+                # Compute cyclic loss and normalize by image size
                 loss_cyc1 = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
+                loss_cyc1 = loss_cyc1 / np.sum(self.image_size)
                 # Generator loss is the sum of these
                 G_loss = loss_Gy.to("cuda:1") + loss_cyc1
 
@@ -224,6 +224,7 @@ class GAN(pl.LightningModule) :
 
                 # Compute cyclic loss
                 loss_cyc2 = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
+                loss_cyc2 = loss_cyc2 / np.sum(self.image_size)
                 # Generator loss is the sum of these
                 G_loss = loss_Gx.to("cuda:0") + loss_cyc2
 
@@ -296,7 +297,7 @@ class GAN(pl.LightningModule) :
     def configure_optimizers(self):
         lr = self.hparams.lr
         G_lr = lr
-        D_lr = 0.001
+        D_lr = 0.0001
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),

@@ -6,6 +6,8 @@ from sklearn.utils import shuffle
 
 import torch
 import torch.utils.data as t_data
+import torchvision.transforms as transforms
+
 
 from data.sitk_processing import read_dicom_image, resample_image, read_nrrd_image
 
@@ -169,7 +171,10 @@ class UnpairedDataset(t_data.Dataset):
         self.x_img_centre = X_image_centre
         self.y_img_centre = Y_image_centre
         self.image_size   = image_size
-        self.transforms    = transform
+        self.transforms   = transforms.Compose([
+                             transforms.Normalize([-814.7], [615.9])
+                             ])
+
 
         # Total number of images (max from either class)
         self.x_size = len(X_image_names)
@@ -251,6 +256,8 @@ class UnpairedDataset(t_data.Dataset):
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
         X = np.clip(X, -1000.0, 1000.0)
+        X = torch.tensor(X, dtype=torch.float32)
+        X = self.transforms(X)
         return X
 
 
@@ -272,18 +279,13 @@ class UnpairedDataset(t_data.Dataset):
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
 
         # Transform the image (augmentation)
-        X = self.transform(X)
-        Y = self.transform(Y)
+        X_tensor = self.transform(X)
+        Y_tensor = self.transform(Y)
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
-        X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-
-        # Convert the np.arrays to PyTorch tensors
-        X_tensor = torch.tensor(X, dtype=torch.float32)
-        Y_tensor = torch.tensor(Y, dtype=torch.float32)
-
+        X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
 
         return X_tensor, Y_tensor
 
