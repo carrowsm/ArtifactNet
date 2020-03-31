@@ -20,6 +20,7 @@ import torchvision
 
 from pytorch_lightning.loggers import TensorBoardLogger
 
+
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
@@ -32,6 +33,7 @@ from data.data_loader import load_image_data_frame, load_img_names, UnpairedData
 from models.generators import UNet3D
 from models.discriminators import PatchGAN_3D
 from util.helper_functions import set_requires_grad
+from loggers import TensorBoardCustom
 
 
 
@@ -142,7 +144,7 @@ class GAN(pl.LightningModule) :
                                   transform=None)
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=0
+                                 shuffle=True, num_workers=10
                                  )
 
         return data_loader
@@ -283,13 +285,14 @@ class GAN(pl.LightningModule) :
                 # Generate some fake images to plot
                 gen_y = self.g_y(x.to("cuda:0"))
                 gen_x = self.g_x(y.to("cuda:1"))
-                images = torch.stack([x[0, 0, 10, :, :].to("cuda:0"),
-                                      y[0, 0, 10, :, :].to("cuda:0"),
-                                  gen_x[0, 0, 10, :, :].to("cuda:0"),
-                                  gen_y[0, 0, 10, :, :].to("cuda:0")])
-                images = images.reshape(4, 1, 300, 300)
-                grid = torchvision.utils.make_grid(images)
-            self.logger.experiment.add_image(f'imgs/epoch{self.current_epoch}', grid, 0)
+                images = [    x[0, 0, 10, :, :].cpu(),
+                              y[0, 0, 10, :, :].cpu(),
+                          gen_x[0, 0, 10, :, :].cpu(),
+                          gen_y[0, 0, 10, :, :].cpu()]
+
+            # Plot the image
+            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, 0)
+
         ### ---------------------- ###
 
         return output
@@ -297,7 +300,7 @@ class GAN(pl.LightningModule) :
     def configure_optimizers(self):
         lr = self.hparams.lr
         G_lr = lr
-        D_lr = 0.0001
+        D_lr = 0.00002
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
@@ -328,8 +331,8 @@ def main(hparams):
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
-    logger  = TensorBoardLogger(hparams.log_dir, name="20_300_300px")
-    logger.log_hyperparams = dontloghparams
+    logger = TensorBoardCustom(hparams.log_dir, name="20_300_300px")
+
     trainer = pl.Trainer(logger=logger, #Currently, PTL breaks when using builtin logger
                          max_nb_epochs=2,
                          # distributed_backend="dp",

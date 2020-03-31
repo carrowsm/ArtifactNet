@@ -274,6 +274,9 @@ class UnpairedDataset(t_data.Dataset):
         X = self.load_img(self.x_img_paths[x_index])
         Y = self.load_img(self.y_img_paths[y_index])
 
+        # Make datatype ints (not unsigned ints)
+        X, Y = X.astype(np.int16), Y.astype(np.int16)
+
         # Crop the image
         X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
