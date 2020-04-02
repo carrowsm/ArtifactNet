@@ -255,9 +255,10 @@ class UnpairedDataset(t_data.Dataset):
     def transform(self, X) :
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
-        # X = np.clip(X, -1000.0, 1000.0)
+        X = np.clip(X, -1000.0, 3000.0) + 1000.0
         X = torch.tensor(X, dtype=torch.float32)
-        X = self.transforms(X)
+        # X = self.transforms(X)
+        X = X / 4000.0
         return X
 
 
@@ -277,6 +278,7 @@ class UnpairedDataset(t_data.Dataset):
         # Make datatype ints (not unsigned ints)
         X, Y = X.astype(np.int16), Y.astype(np.int16)
 
+
         # Crop the image
         X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
@@ -287,9 +289,15 @@ class UnpairedDataset(t_data.Dataset):
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
-        X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-
+        try :
+            X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        except :
+            print("Error reading image {self.x_img_paths[x_index]}")
+        try :
+            Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        except :
+            print("Error reading image {self.x_img_paths[x_index]}")
+            
         return X_tensor, Y_tensor
 
 

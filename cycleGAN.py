@@ -146,6 +146,7 @@ class GAN(pl.LightningModule) :
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
                                  shuffle=True, num_workers=10
                                  )
+        self.dataset_size = len(dataset)
 
         return data_loader
 
@@ -202,9 +203,9 @@ class GAN(pl.LightningModule) :
 
                 # Compute cyclic loss and normalize by image size
                 loss_cyc1 = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
-                loss_cyc1 = loss_cyc1 / np.sum(self.image_size)
+                loss_cyc1 = loss_cyc1
                 # Generator loss is the sum of these
-                G_loss = loss_Gy.to("cuda:1") + loss_cyc1
+                G_loss = loss_Gy.to("cuda:1") + (10.0 * loss_cyc1)
 
             else :
                 ### Calculate G_Y loss ###
@@ -226,9 +227,9 @@ class GAN(pl.LightningModule) :
 
                 # Compute cyclic loss
                 loss_cyc2 = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
-                loss_cyc2 = loss_cyc2 / np.sum(self.image_size)
+                loss_cyc2 = loss_cyc2
                 # Generator loss is the sum of these
-                G_loss = loss_Gx.to("cuda:0") + loss_cyc2
+                G_loss = loss_Gx.to("cuda:0") + (10.0 * loss_cyc2)
 
 
 
@@ -238,6 +239,8 @@ class GAN(pl.LightningModule) :
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
+            self.logger.experiment.add_scalar(f'g_loss', G_loss,
+                             batch_nb+(self.dataset_size*self.current_epoch))
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
@@ -268,7 +271,7 @@ class GAN(pl.LightningModule) :
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
             # Total discriminator loss is the sum of the two
-            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * 2
+            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * 4
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -277,10 +280,12 @@ class GAN(pl.LightningModule) :
                                   'log': tqdm_dict
                                   })
 
-
+            # Plot loss every iteration
+            self.logger.experiment.add_scalar(f'd_loss', D_loss,
+                               batch_nb+(self.dataset_size*self.current_epoch))
 
         ### Log some sample images once per epoch ###
-        if batch_nb == 0 :
+        if batch_nb % 10 == 0 :
             with torch.no_grad() :
                 # Generate some fake images to plot
                 gen_y = self.g_y(x.to("cuda:0"))
@@ -291,7 +296,7 @@ class GAN(pl.LightningModule) :
                           gen_y[0, 0, 10, :, :].cpu()]
 
             # Plot the image
-            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, 0)
+            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, batch_nb)
 
         ### ---------------------- ###
 
@@ -299,8 +304,8 @@ class GAN(pl.LightningModule) :
 
     def configure_optimizers(self):
         lr = self.hparams.lr
-        G_lr = lr
-        D_lr = 0.00002
+        G_lr = 0.001
+        D_lr = 0.0001
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
@@ -309,17 +314,6 @@ class GAN(pl.LightningModule) :
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
         return [opt_g, opt_d], []
 
-
-
-
-
-
-
-def dontloghparams(x) :
-    """Hacky workaround to hparam logging being
-    broken in pytorch ligthning"""
-    # TO fix this, write custom logger
-    return
 
 
 def main(hparams):
