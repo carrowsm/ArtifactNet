@@ -264,14 +264,6 @@ class UnpairedDataset(t_data.Dataset):
         # X = self.transforms(X)
         X = X / 4000.0
         return X
-    def check_size(self, X) :
-        if list(self.image_size) == list(X.shape) :
-            return
-        else :
-            print(f"Image has incorrect shape")
-            i = np.random.randint(0, self.x_size - 1)
-            print(f"Taking image {i} instead")
-            self[i]
 
 
     def __getitem__(self, index):
@@ -296,8 +288,8 @@ class UnpairedDataset(t_data.Dataset):
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
 
         # Check image has the right size
-        self.check_size(X)
-        self.check_size(Y)
+        # self.check_size(X)
+        # self.check_size(Y)
 
         # Transform the image (augmentation)
         X_tensor = self.transform(X)
@@ -305,8 +297,12 @@ class UnpairedDataset(t_data.Dataset):
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
-        X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        try :
+            X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+            Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        except :
+            i = np.random.randint(0, self.x_size - 1)
+            return self[i]
 
 
         return X_tensor, Y_tensor

@@ -107,7 +107,9 @@ class GAN(pl.LightningModule) :
 
         # Define loss functions
         self.l1_loss  = nn.L1Loss(reduction="mean")
-        self.adv_loss = nn.MSELoss()
+        # self.adv_loss = nn.MSELoss(reduction="sum")
+        self.adv_loss = nn.BCELoss()
+
 
 
     def gpu_check(self) :
@@ -325,7 +327,7 @@ class GAN(pl.LightningModule) :
         """
         lr = self.hparams.lr
         G_lr = 0.0004
-        D_lr = 0.00002
+        D_lr = 0.0001
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
@@ -355,6 +357,8 @@ def main(hparams):
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
+                         accumulate_grad_batches=2,
+                         gradient_clip_val=0.2,
                          max_nb_epochs=2,
                          )
 
