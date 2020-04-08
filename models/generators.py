@@ -66,6 +66,7 @@ class UNet3D(nn.Module):
         super(UNet3D, self).__init__()
 
         features = init_features
+        # self.bs, self.ch, self.d, self.w, self.h = input_shape
         ### ENCODER ###
         """
             Use the original U-Net architecture from the original paper:

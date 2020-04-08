@@ -98,8 +98,10 @@ class PatchGAN_3D(nn.Module) :
         self.conv3 = nn.Conv3d(in_channels=n_filters * 2, out_channels=1,
                                kernel_size=ks, stride=s, padding=pads, bias=True)
 
-        self.convf = nn.Conv3d(in_channels=1, out_channels=1,
-                               kernel_size=[1, 36, 36], stride=s, padding=0, bias=True)
+        # self.convf = nn.Conv3d(in_channels=1, out_channels=1,
+        #                        kernel_size=[1, 36, 36], stride=s, padding=0, bias=True)
+
+        self.fc = torch.nn.Linear(in_features=1*2*37*37, out_features=1, bias=True)
 
         self.sigmoid = torch.nn.Sigmoid()
 
@@ -111,6 +113,7 @@ class PatchGAN_3D(nn.Module) :
         X = self.bnorm(X)                   # (N, 128,  5,  75,  75)
         X = self.Lrelu(X)                   # (N, 128,  5,  75,  75)
         X = self.conv3(X)                   # (N,   1,  2,  37,  37)
-        X = self.convf(X)                   # (N,   1,  1,   1,   1)
+        # X = self.convf(X)                 # (N,   1,  1,   1,   1)
+        X = self.fc(X.view(-1, 1*2*37*37))
         X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
         return X

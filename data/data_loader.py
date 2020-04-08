@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -187,6 +188,9 @@ class UnpairedDataset(t_data.Dataset):
         # Get the cropping function appropriate for the format of centre_pix
         self.crop_img = self.get_cropper()
 
+        self.count = 0
+
+
 
 
     def get_img_loader(self) :
@@ -260,6 +264,14 @@ class UnpairedDataset(t_data.Dataset):
         # X = self.transforms(X)
         X = X / 4000.0
         return X
+    def check_size(self, X) :
+        if list(self.image_size) == list(X.shape) :
+            return
+        else :
+            print(f"Image has incorrect shape")
+            i = np.random.randint(0, self.x_size - 1)
+            print(f"Taking image {i} instead")
+            self[i]
 
 
     def __getitem__(self, index):
@@ -283,21 +295,20 @@ class UnpairedDataset(t_data.Dataset):
         X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
 
+        # Check image has the right size
+        self.check_size(X)
+        self.check_size(Y)
+
         # Transform the image (augmentation)
         X_tensor = self.transform(X)
         Y_tensor = self.transform(Y)
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
-        try :
-            X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        except :
-            print("Error reading image {self.x_img_paths[x_index]}")
-        try :
-            Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        except :
-            print("Error reading image {self.x_img_paths[x_index]}")
-            
+        X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+
+
         return X_tensor, Y_tensor
 
 

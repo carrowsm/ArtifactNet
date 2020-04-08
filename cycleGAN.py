@@ -2,6 +2,8 @@
 This script trains a cycleGAN neural network to remove dental artifacts (DA)
 from RadCure CT image volumes.
 
+To begin training this model on H4H, run
+$ sbatch train_cycleGAN.sh
 """
 
 
@@ -180,6 +182,11 @@ class GAN(pl.LightningModule) :
             # Ds require no gradients when optimizing Gs
             set_requires_grad([self.d_x, self.d_y], False)
 
+            if self.current_epoch == 0 :
+                lam = 1.0
+            else :
+                lam = 10.0
+
             # Alternate between optimizing G_X and G_Y
             if batch_nb % 2 == 0 :
                 ### Calculate G_Y loss ###
@@ -196,16 +203,16 @@ class GAN(pl.LightningModule) :
                 d_y_gen_y = self.d_y(gen_y.to("cuda:0")).view(-1)
 
                 # Compute adversarial loss
-                loss_Gy = self.adv_loss(d_y_gen_y.to("cuda:0"), ones.to("cuda:0"))
+                adv_g_loss = self.adv_loss(d_y_gen_y.to("cuda:0"), ones.to("cuda:0"))
 
                 # Generate fake images from fake images (for cyclical loss)
                 gen_x_gen_y = self.g_x(gen_y.to("cuda:1")) # fake DA+ from fake DA-
 
                 # Compute cyclic loss and normalize by image size
-                loss_cyc1 = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
-                loss_cyc1 = loss_cyc1
+                loss_cyc = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
+                loss_cyc = loss_cyc
                 # Generator loss is the sum of these
-                G_loss = loss_Gy.to("cuda:1") + (10.0 * loss_cyc1)
+                G_loss = adv_g_loss.to("cuda:1") + (lam * loss_cyc)
 
             else :
                 ### Calculate G_Y loss ###
@@ -220,16 +227,16 @@ class GAN(pl.LightningModule) :
                 d_x_gen_x = self.d_x(gen_x.to("cuda:1")).view(-1)
 
                 # Compute adversarial loss
-                loss_Gx = self.adv_loss(d_x_gen_x.to("cuda:1"), ones.to("cuda:1"))
+                adv_g_loss = self.adv_loss(d_x_gen_x.to("cuda:1"), ones.to("cuda:1"))
 
                 # Generate fake images from fake images (for cyclical loss)
                 gen_y_gen_x = self.g_y(gen_x.to("cuda:0")) # fake DA+ from fake DA-
 
                 # Compute cyclic loss
-                loss_cyc2 = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
-                loss_cyc2 = loss_cyc2
+                loss_cyc = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
+                loss_cyc = loss_cyc
                 # Generator loss is the sum of these
-                G_loss = loss_Gx.to("cuda:0") + (10.0 * loss_cyc2)
+                G_loss = adv_g_loss.to("cuda:0") + (lam * loss_cyc)
 
 
 
@@ -239,7 +246,8 @@ class GAN(pl.LightningModule) :
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
-            self.logger.experiment.add_scalar(f'g_loss', G_loss,
+            self.logger.experiment.add_scalars(f'g_loss', {"adv_loss": adv_g_loss,
+                                                           "cyc_loss": loss_cyc},
                              batch_nb+(self.dataset_size*self.current_epoch))
 
         ### TRAIN DISCRIMINATORS ###
@@ -271,7 +279,12 @@ class GAN(pl.LightningModule) :
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
             # Total discriminator loss is the sum of the two
-            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * 4
+            # if self.current_epoch == 0 :
+            #     penalty = 10.0 - (1*(self.dataset_size - batch_nb) / self.dataset_size)
+            # else :
+            #     penalty = 1.0
+            penalty = 1.0
+            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * penalty
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -302,17 +315,29 @@ class GAN(pl.LightningModule) :
 
         return output
 
+
+
+
+
     def configure_optimizers(self):
+        """
+        Define two optimizers (D & G), each with its own learning rate scheduler.
+        """
         lr = self.hparams.lr
-        G_lr = 0.001
-        D_lr = 0.0001
+        G_lr = 0.0004
+        D_lr = 0.00002
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
                                 self.g_y.parameters()), lr=G_lr, betas=(b1, b2))
         opt_d = torch.optim.Adam(itertools.chain(self.d_x.parameters(),
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
-        return [opt_g, opt_d], []
+
+        # Decay generator learning rate by factor of 10 after 1 epoch
+        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[1, 5], gamma=0.1)
+        # Increase discriminator learning rate by factor of 5 every epoch
+        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[1, 2, 3], gamma=5)
+        return [opt_g, opt_d], [scheduler_g, scheduler_d]
 
 
 
@@ -325,16 +350,12 @@ def main(hparams):
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
+    # Custom logger defined in loggers.py
     logger = TensorBoardCustom(hparams.log_dir, name="20_300_300px")
 
-    trainer = pl.Trainer(logger=logger, #Currently, PTL breaks when using builtin logger
+    # Main PLT training module
+    trainer = pl.Trainer(logger=logger,
                          max_nb_epochs=2,
-                         # distributed_backend="dp",
-                         # gpus=[0, 1],
-                         # accumulate_grad_batches=1
-                         # amp_level='O2', use_amp=False
-                         # precision=16
-                         # amp_level='O1', precision=16
                          )
 
     # ------------------------
