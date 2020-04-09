@@ -115,5 +115,5 @@ class PatchGAN_3D(nn.Module) :
         X = self.conv3(X)                   # (N,   1,  2,  37,  37)
         # X = self.convf(X)                 # (N,   1,  1,   1,   1)
         X = self.fc(X.view(-1, 1*2*37*37))
-        X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
+        # X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
         return X
