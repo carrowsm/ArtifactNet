@@ -33,7 +33,7 @@ from config import get_args
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
 from models.generators import UNet3D
-from models.discriminators import PatchGAN_3D
+from models.discriminators import PatchGAN_3D, CNN_3D
 from util.helper_functions import set_requires_grad
 from loggers import TensorBoardCustom
 
@@ -80,8 +80,8 @@ class GAN(pl.LightningModule) :
         self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = PatchGAN_3D(input_channels=1, out_size=1, n_filters=64)
-        self.d_x = PatchGAN_3D(input_channels=1, out_size=1, n_filters=64)
+        self.d_y = CNN_3D(input_channels=1, out_size=1, n_filters=64)
+        self.d_x = CNN_3D(input_channels=1, out_size=1, n_filters=64)
         ### ------------------- ###
 
         # Put networks on GPUs
