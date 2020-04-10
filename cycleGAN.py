@@ -107,7 +107,7 @@ class GAN(pl.LightningModule) :
 
         # Define loss functions
         self.l1_loss  = nn.L1Loss(reduction="mean")
-        self.adv_loss = nn.MSELoss(reduction="sum")
+        self.adv_loss = nn.MSELoss(reduction="mean")
         # self.adv_loss = nn.BCELoss()
 
 
@@ -184,10 +184,6 @@ class GAN(pl.LightningModule) :
             # Ds require no gradients when optimizing Gs
             set_requires_grad([self.d_x, self.d_y], False)
 
-            # if self.current_epoch == 0 :
-            #     lam = 1.0
-            # else :
-            #     lam = 10.0
             lam = 10.0
 
             # Alternate between optimizing G_X and G_Y
@@ -213,12 +209,12 @@ class GAN(pl.LightningModule) :
 
                 # Compute cyclic loss and normalize by image size
                 loss_cyc = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
-                loss_cyc = loss_cyc
+
                 # Generator loss is the sum of these
                 G_loss = adv_g_loss.to("cuda:1") + (lam * loss_cyc)
 
             else :
-                ### Calculate G_Y loss ###
+                ### Calculate G_X loss ###
                 # G_Y require no gradients when optimizing G_X
                 set_requires_grad([self.g_y], False)
                 set_requires_grad([self.g_x], True)
@@ -237,7 +233,7 @@ class GAN(pl.LightningModule) :
 
                 # Compute cyclic loss
                 loss_cyc = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
-                loss_cyc = loss_cyc
+
                 # Generator loss is the sum of these
                 G_loss = adv_g_loss.to("cuda:0") + (lam * loss_cyc)
 
@@ -286,7 +282,7 @@ class GAN(pl.LightningModule) :
             #     penalty = 10.0 - (1*(self.dataset_size - batch_nb) / self.dataset_size)
             # else :
             #     penalty = 1.0
-            penalty = 2.0
+            penalty = 1.0
             D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * penalty
 
             # Save the discriminator loss in a dictionary
@@ -358,7 +354,7 @@ def main(hparams):
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         accumulate_grad_batches=50,
+                         accumulate_grad_batches=10,
                          gradient_clip_val=0.0,
                          max_nb_epochs=2,
                          )

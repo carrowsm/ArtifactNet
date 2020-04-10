@@ -66,7 +66,7 @@ class UNet3D(nn.Module):
         super(UNet3D, self).__init__()
 
         features = init_features
-        # self.bs, self.ch, self.d, self.w, self.h = input_shape
+
         ### ENCODER ###
         """
             Use the original U-Net architecture from the original paper:
@@ -104,6 +104,8 @@ class UNet3D(nn.Module):
         self.decoder1 = self.conv_relu(features * 2, features, name="dec1")
 
         self.conv = nn.Conv3d(in_channels=features, out_channels=out_channels, kernel_size=1)
+
+
         ### ------- ###
 
     def forward(self, x):
@@ -129,8 +131,8 @@ class UNet3D(nn.Module):
         dec1 = self.upconv1(dec2)                          # (N, 64, 20, 300, 300)
         dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 20, 300, 300)
         dec1 = self.decoder1(dec1)                         # (N, 64, 20, 300, 300)
-        return torch.sigmoid(self.conv(dec1))              # (N, 1, 20, 300, 300)
-
+        # return torch.sigmoid(self.conv(dec1))              # (N, 1, 20, 300, 300)
+        return self.conv(dec1)
     @staticmethod
     def conv_relu(in_channels, features, name):
         '''Perform:
@@ -140,6 +142,7 @@ class UNet3D(nn.Module):
         4. Another convolution, with same input and output size
         5. batch normalization
         6. Relu'''
+        normfunc = nn.InstanceNorm3d
         return nn.Sequential(
             OrderedDict(
                 [
@@ -153,20 +156,20 @@ class UNet3D(nn.Module):
                             bias=False,
                         ),
                     ),
-                    (name + "norm1", nn.BatchNorm3d(num_features=features)),
+                    (name + "norm1", normfunc(num_features=features)),
                     (name + "relu1", nn.LeakyReLU(0.2, inplace=True)),
-                    (
-                        name + "conv2",
-                        nn.Conv3d(
-                            in_channels=features,
-                            out_channels=features,
-                            kernel_size=3,
-                            padding=1,
-                            bias=False,
-                        ),
-                    ),
-                    (name + "norm2", nn.BatchNorm3d(num_features=features)),
-                    (name + "relu2", nn.LeakyReLU(0.2, inplace=True)),
+                    # (
+                    #     name + "conv2",
+                    #     nn.Conv3d(
+                    #         in_channels=features,
+                    #         out_channels=features,
+                    #         kernel_size=3,
+                    #         padding=1,
+                    #         bias=False,
+                    #     ),
+                    # ),
+                    # (name + "norm2", normfunc(num_features=features)),
+                    # (name + "relu2", nn.LeakyReLU(0.2, inplace=True)),
                 ]
             )
         )

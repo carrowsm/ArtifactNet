@@ -67,7 +67,7 @@ class CNN_2D(nn.Module):
 
 
 
-class PatchGAN_3D(nn.Module) :
+class CNN_3D(nn.Module) :
     """A 3D PatchGAN """
     def __init__(self, input_channels=1, out_size=1, n_filters=64):
         """
@@ -79,7 +79,7 @@ class PatchGAN_3D(nn.Module) :
             n_filters :            The number of filters to use in the last
                                    concolutional layer (default=64).
         """
-        super(PatchGAN_3D, self).__init__()
+        super(CNN_3D, self).__init__()
 
         # Parameters for convolutional layers
         ks = 4     # Kernel size
@@ -116,4 +116,77 @@ class PatchGAN_3D(nn.Module) :
         # X = self.convf(X)                 # (N,   1,  1,   1,   1)
         X = self.fc(X.view(-1, 1*2*37*37))
         # X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
+        return X
+
+
+class PatchGAN_3D(nn.Module) :
+    """A 3D PatchGAN """
+    def __init__(self, input_channels=1, out_size=1, n_filters=64):
+        """
+        Parameters:
+            input_channels (int) : Number of input channels (default=1).
+            out_size (int) :       The shape of the output tensor. The output
+                                   will be cubic with shape
+                                   (out_size, out_size, out_size). Default=1.
+            n_filters :            The number of filters to use in the last
+                                   concolutional layer (default=64).
+        """
+        super(PatchGAN_3D, self).__init__()
+
+        # Parameters for convolutional layers
+        ks = 4       # Kernel size
+        pads = 1     # Padding size
+        s = [1, 2, 2]# Convolution stride
+        use_bias = True
+        normfunc = nn.InstanceNorm3d
+
+        self.conv1 = nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
+                               kernel_size=ks, stride=s, padding=pads)
+        self.conv2 = nn.Conv3d(in_channels=n_filters, out_channels=n_filters * 2,
+                               kernel_size=ks, stride=s, padding=pads, bias=use_bias)
+        self.conv3 = nn.Conv3d(in_channels=n_filters * 2, out_channels=n_filters * 4,
+                               kernel_size=ks, stride=s, padding=pads, bias=use_bias)
+        self.conv4 = nn.Conv3d(in_channels=n_filters * 4, out_channels=n_filters * 8,
+                               kernel_size=ks, stride=s, padding=pads, bias=use_bias)
+
+        self.convf = nn.Conv3d(in_channels=n_filters * 8, out_channels=1,
+                               kernel_size=[16, 18,  18], stride=s, padding=0, bias=True)
+
+        self.inorm2 = normfunc(n_filters * 2, affine=True)
+        self.inorm3 = normfunc(n_filters * 4, affine=True)
+        self.inorm4 = normfunc(n_filters * 8, affine=True)
+
+        self.Lrelu1 = nn.LeakyReLU(0.2, True)
+        self.Lrelu2 = nn.LeakyReLU(0.2, True)
+        self.Lrelu3 = nn.LeakyReLU(0.2, True)
+        self.Lrelu4 = nn.LeakyReLU(0.2, True)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, X) :
+        # Assume batch_size = N and X.shape = (N,   1, 20, 300, 300)
+        # Layer 1
+        X = self.conv1(X)                    # (N,  64, 19, 150, 150)
+        X = self.Lrelu1(X)                   # (N,  64, 19, 150, 150)
+
+        # Layer 2
+        X = self.conv2(X)                    # (N, 128,  18, 75,  75)
+        X = self.Lrelu2(X)                   # (N, 128,  18, 75,  75)
+        X = self.inorm2(X)                   # (N, 128,  18, 75,  75)
+
+        # Layer 3
+        X = self.conv3(X)                    # (N, 256,  17, 37,  37)
+        X = self.Lrelu3(X)                   # (N, 256,  17, 37,  37)
+        X = self.inorm3(X)                   # (N, 256,  17, 37,  37)
+
+        # Layer 4
+        X = self.conv4(X)                    # (N, 512,  16, 18,  18)
+        X = self.Lrelu4(X)                   # (N, 512,  16, 18,  18)
+        X = self.inorm4(X)                   # (N, 512,  16, 18,  18)
+
+        # Final convolutional layer to make scalar output
+        X = self.convf(X)                   # (N,   1,  1,   1,   1)
+
+        # X = self.sigmoid(X)
+
         return X
