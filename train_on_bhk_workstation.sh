@@ -8,7 +8,7 @@ source /cluster/home/carrowsm/.bashrc
 conda activate DAnet
 
 # Python script we are running
-path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
+path=cycleGAN.py
 
 # Paths to data and logs
 csv_path="/cluster/home/carrowsm/data/radcure_DA_labels.csv"
