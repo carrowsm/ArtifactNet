@@ -152,9 +152,9 @@ class PatchGAN_3D(nn.Module) :
         self.convf = nn.Conv3d(in_channels=n_filters * 8, out_channels=1,
                                kernel_size=[16, 18,  18], stride=s, padding=0, bias=True)
 
-        self.inorm2 = normfunc(n_filters * 2, affine=True)
-        self.inorm3 = normfunc(n_filters * 4, affine=True)
-        self.inorm4 = normfunc(n_filters * 8, affine=True)
+        self.inorm2 = normfunc(n_filters * 2, affine=False)
+        self.inorm3 = normfunc(n_filters * 4, affine=False)
+        self.inorm4 = normfunc(n_filters * 8, affine=False)
 
         self.Lrelu1 = nn.LeakyReLU(0.2, True)
         self.Lrelu2 = nn.LeakyReLU(0.2, True)
