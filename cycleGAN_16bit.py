@@ -145,7 +145,7 @@ class GAN(pl.LightningModule) :
                                   transform=None)
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=10
+                                 shuffle=True, num_workers=10, drop_last=True
                                  )
         self.dataset_size = len(dataset)
 
