@@ -259,16 +259,21 @@ class UnpairedDataset(t_data.Dataset):
     def transform(self, X) :
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
-        X = np.clip(X, -1000.0, 3000.0) + 1000.0
+        min_val = -1000.0
+        max_val =  3000.0
+        X = np.clip(X, min_val, max_val) - min_val  # Make min 0
         X = torch.tensor(X, dtype=torch.float32)
-        # X = self.transforms(X)
-        X = X / 4000.0
+        # X = self.transforms(X)                    # Apply augmentations
+        X = X / (max_val - min_val)                 # Make range (0, 1)
         return X
 
 
     def __getitem__(self, index):
         '''
-
+        Returns a pair of DA+ and DA- images from that dataset and applies
+        transforms. Image i from DA+ images will be taken and a random DA-
+        image will be taken. This method is called by calling dataset[index]
+        in the pytorch lightning module.
         '''
         # Randomize index for images in Y domain to avoid pairs
         x_index = index
