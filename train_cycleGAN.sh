@@ -6,7 +6,7 @@
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --output=DA_removal_GAN.out
 
 
@@ -27,7 +27,7 @@ log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=1                             # Batch size for trainer
+batch_size=4                             # Batch size for trainer
 aug_factor=1
 
 
