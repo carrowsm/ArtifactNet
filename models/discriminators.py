@@ -190,3 +190,57 @@ class PatchGAN_3D(nn.Module) :
         # X = self.sigmoid(X)
 
         return X
+
+
+
+class PatchGAN_NLayer(nn.Module) :
+    """A 3D PatchGAN with variable depth"""
+    def __init__(self, input_channels=1, out_size=1, n_filters=64, n_layers=4, norm="instance"
+                 input_shape=[20, 300, 300]):
+        """
+        Parameters:
+            input_channels (int) : Number of input channels (default=1).
+            out_size (int) :       The shape of the output tensor. The output
+                                   will be cubic with shape
+                                   (out_size, out_size, out_size). Default=1.
+            n_filters :            The number of filters to use in the last
+                                   concolutional layer (default=64).
+            n_layers :             The number of convolutional layers to use
+                                   (default = 4).
+            norm :                 Type of normalization to use (can be either
+                                   'instance' or 'batch').
+            input_shape :          Shape of the input tensor (input image).
+        """
+        super(PatchGAN_general, self).__init__()
+
+        # Parameters for convolutional layers
+        ks = 4                    # Kernel size
+        pads = 1                  # Padding size
+        s = [1, 2, 2]             # Convolution stride
+        use_bias = True
+        normfunc = nn.InstanceNorm3d
+
+
+        # Build up layers sequentially
+        net_list = [nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
+                               kernel_size=ks, stride=s, padding=pads),
+                    nn.LeakyReLU(0.2, True)]
+
+        # Add middle layers
+        for i in range(1, n_layers) :
+            in_channels = n_filters * (2 ** (i - 1))
+            out_filters = n_filters * (2 ** i)
+            net_list += [nn.Conv3d(in_channels=in_channels, out_channels=out_filters,
+                                   kernel_size=ks, stride=s, padding=pads),
+                         normfunc(out_filters, affine=False),
+                         nn.LeakyReLU(0.2, True)]
+
+        # Add final conv layer
+        net_list += [nn.Conv3d(in_channels=out_filters, out_channels=1,
+                               kernel_size=[16, 18,  18], stride=s, padding=0, bias=True)]
+
+        self.net = nn.Sequential(*net_list)
+
+    def forward(self, X) :
+        X = self.net(X)
+        return X

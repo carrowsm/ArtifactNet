@@ -201,15 +201,11 @@ class GAN(pl.LightningModule) :
 
             ### Compute Cycle Consistency Loss ###
             # Generate fake images from fake images (for cyclical loss)
-            gen_x_gen_y = self.g_x(gen_y) # fake DA+ from fake DA-
-
-            # Generate fake images from fake images (for cyclical loss)
-            gen_y_gen_x = self.g_y(gen_x) # fake DA+ from fake DA-
-
-            # Compute cyclic loss and normalize by image size
-            loss_cyc_X = self.l1_loss(gen_x_gen_y, x) * self.lam
+            gen_x_gen_y = self.g_x(gen_y)     # fake DA+ from fake DA-
+            gen_y_gen_x = self.g_y(gen_x)     # fake DA- from fake DA+
 
             # Compute cyclic loss
+            loss_cyc_X = self.l1_loss(gen_x_gen_y, x) * self.lam
             loss_cyc_Y = self.l1_loss(gen_y_gen_x, y) * self.lam
 
             # Generator loss is the sum of these
@@ -228,12 +224,10 @@ class GAN(pl.LightningModule) :
                                                            "adv_X": loss_adv_X,
                                                            "cyc_Y": loss_cyc_Y,
                                                            "cyc_X": loss_cyc_X},
-                             batch_nb+(self.dataset_size*self.current_epoch))
+                  batch_nb+(self.dataset_size*self.current_epoch // batch_size))
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
-            # set_requires_grad([self.d_x, self.d_y], True)
-
             # Generate some images
             gen_y = self.g_y(x) # fake DA- images from real DA+ imgs
             gen_x = self.g_x(y) # fake DA+ images from real DA- imgs
@@ -269,7 +263,7 @@ class GAN(pl.LightningModule) :
 
             # Plot loss every iteration
             self.logger.experiment.add_scalar(f'd_loss', D_loss,
-                               batch_nb+(self.dataset_size*self.current_epoch))
+            batch_nb+(self.dataset_size*self.current_epoch // batch_size))
 
         ### Log some sample images once per epoch ###
         if batch_nb % 10 == 0 :
@@ -298,8 +292,8 @@ class GAN(pl.LightningModule) :
         Define two optimizers (D & G), each with its own learning rate scheduler.
         """
         lr = self.hparams.lr
-        G_lr = 0.0002
-        D_lr = 0.0002
+        G_lr = lr
+        D_lr = lr
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
@@ -308,9 +302,9 @@ class GAN(pl.LightningModule) :
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
 
         # Decay generator learning rate by factor of 10 after 1 epoch
-        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[1, 5], gamma=0.1)
+        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[1, 2, 3], gamma=0.5)
         # Increase discriminator learning rate by factor of 5 every epoch
-        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[1, 2, 3], gamma=5)
+        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[1, 2, 3], gamma=0.5)
         return [opt_g, opt_d], [scheduler_g, scheduler_d]
 
 
@@ -335,6 +329,7 @@ def main(hparams):
                          max_nb_epochs=2,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=4,
+                         distributed_backend="dp"
                          )
 
     # ------------------------
