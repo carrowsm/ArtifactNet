@@ -324,9 +324,9 @@ def main(hparams):
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         accumulate_grad_batches=10,
-                         gradient_clip_val=0.5,
-                         max_nb_epochs=2,
+                         # accumulate_grad_batches=10,
+                         gradient_clip_val=0.9,
+                         # max_nb_epochs=2,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=4,
                          distributed_backend="dp"
