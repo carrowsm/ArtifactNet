@@ -260,7 +260,7 @@ class UnpairedDataset(t_data.Dataset):
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
         min_val = -1000.0
-        max_val =  3000.0
+        max_val =  1500.0
         X = np.clip(X, min_val, max_val) - min_val  # Make min 0
         X = torch.tensor(X, dtype=torch.float32)
         # X = self.transforms(X)                    # Apply augmentations
