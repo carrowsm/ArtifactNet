@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -t 0-05:00:00
-#SBATCH --mem=200G
+#SBATCH -t 2-00:00:00
+#SBATCH --mem=220G
 #SBATCH -J ArtifactNet
 #SBATCH -c 10
 #SBATCH -N 1
@@ -8,7 +8,7 @@
 #SBATCH --partition=gpu_radiomics
 #SBATCH --gres=gpu:4
 #SBATCH --output=DA_removal_GAN.out
-
+#SBATCH --ntasks-per-node=4
 
 
 echo 'Starting Shell Script'

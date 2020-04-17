@@ -8,6 +8,18 @@ import torch.nn as nn
 
 
 
+def conv_out_shape(in_shape, kernel_size=[4,4,4], stride=1, padding=0, dilation=1) :
+    """Calculate the output shape of a tensor passed to conv3d with
+    these params"""
+    # Cast lists to arrays
+    in_shape = np.array(in_shape) if type(in_shape) is list else in_shape
+    stride = np.array(stride) if type(stride) is list else stride
+
+    out = ((in_shape + 2 * padding - dilation * (kernel_size - 1) - 1) / stride) + 1
+    return np.floor(out)
+
+
+
 
 class CNN_2D(nn.Module):
     def __init__(self, output_dim=1):
@@ -62,7 +74,6 @@ class CNN_2D(nn.Module):
         # Constrain output of model to (0, 1)
         X = self.sigmoid(X)
 
-
         return X
 
 
@@ -98,12 +109,8 @@ class CNN_3D(nn.Module) :
         self.conv3 = nn.Conv3d(in_channels=n_filters * 2, out_channels=1,
                                kernel_size=ks, stride=s, padding=pads, bias=True)
 
-        # self.convf = nn.Conv3d(in_channels=1, out_channels=1,
-        #                        kernel_size=[1, 36, 36], stride=s, padding=0, bias=True)
-
         self.fc = torch.nn.Linear(in_features=1*2*37*37, out_features=1, bias=True)
 
-        self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, X) :
         # Assume batch_size = N and X.shape = (N,   1, 20, 300, 300)
@@ -113,9 +120,7 @@ class CNN_3D(nn.Module) :
         X = self.bnorm(X)                   # (N, 128,  5,  75,  75)
         X = self.Lrelu(X)                   # (N, 128,  5,  75,  75)
         X = self.conv3(X)                   # (N,   1,  2,  37,  37)
-        # X = self.convf(X)                 # (N,   1,  1,   1,   1)
-        X = self.fc(X.view(-1, 1*2*37*37))
-        # X = self.sigmoid(X)                 # (N,   1,  1,   1,   1)
+        X = self.fc(X.view(-1, 1*2*37*37))  # (N,   1,  1,   1,   1)
         return X
 
 
@@ -134,10 +139,10 @@ class PatchGAN_3D(nn.Module) :
         super(PatchGAN_3D, self).__init__()
 
         # Parameters for convolutional layers
-        ks = 4       # Kernel size
-        pads = 1     # Padding size
-        s = [1, 2, 2]# Convolution stride
-        use_bias = True
+        ks = 4              # Kernel size
+        pads = 1            # Padding size
+        s = [1, 2, 2]       # Convolution stride
+        use_bias = True     # Include learnable bias term
         normfunc = nn.InstanceNorm3d
 
         self.conv1 = nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
@@ -187,15 +192,70 @@ class PatchGAN_3D(nn.Module) :
         # Final convolutional layer to make scalar output
         X = self.convf(X)                   # (N,   1,  1,   1,   1)
 
-        # X = self.sigmoid(X)
-
         return X
 
+
+class CNN_NLayer(nn.Module) :
+    """A 3D CNN with variable depth"""
+    def __init__(self, input_channels=1, out_size=1, n_filters=64, n_layers=4, norm="instance",
+                 input_shape=[20, 300, 300]):
+        """
+        Parameters:
+            input_channels (int) : Number of input channels (default=1).
+            out_size (int) :       The shape of the output tensor. The output
+                                   will be cubic with shape
+                                   (out_size, out_size, out_size). Default=1.
+            n_filters :            The number of filters to use in the last
+                                   concolutional layer (default=64).
+            n_layers :             The number of convolutional layers to use
+                                   (default = 4).
+            norm :                 Type of normalization to use (can be either
+                                   'instance' or 'batch').
+        """
+        super(CNN_NLayer, self).__init__()
+
+        # Parameters for convolutional layers
+        ks = 4             # Kernel size
+        pads = 1           # Padding size
+        s = [1, 2, 2]      # Convolution stride
+        use_bias = True
+        normfunc = nn.InstanceNorm3d
+
+
+        # Create first convolutional layer
+        net_list = [nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
+                               kernel_size=ks, stride=s, padding=pads),
+                    nn.LeakyReLU(0.2, True)]
+        out_shape = conv_out_shape(input_shape, kernel_size=ks, stride=s, padding=pads)
+
+        # Add middle layers
+        for i in range(1, n_layers) :
+            in_channels = n_filters * (2 ** (i - 1))
+            out_filters = n_filters * (2 ** i)
+            net_list += [nn.Conv3d(in_channels=in_channels, out_channels=out_filters,
+                                   kernel_size=ks, stride=s, padding=pads),
+                         normfunc(out_filters, affine=False),
+                         nn.LeakyReLU(0.2, True)]
+            out_shape = conv_out_shape(out_shape, kernel_size=ks, stride=s, padding=pads)
+
+
+        # Add final conv layer
+        self.fc_in_size = int(np.prod(out_shape))  # Length of flattened array from last conv layer
+        self.fc = nn.Linear(in_features=self.fc_in_size, out_features=1, bias=use_bias)
+
+        self.net = nn.Sequential(*net_list)
+
+    def forward(self, X) :
+        X = self.net(X)
+        # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
+        X = X.view(-1, self.fc_in_size)
+        X = self.fc(X)
+        return X
 
 
 class PatchGAN_NLayer(nn.Module) :
     """A 3D PatchGAN with variable depth"""
-    def __init__(self, input_channels=1, out_size=1, n_filters=64, n_layers=4, norm="instance"
+    def __init__(self, input_channels=1, out_size=1, n_filters=64, n_layers=4, norm="instance",
                  input_shape=[20, 300, 300]):
         """
         Parameters:
@@ -211,7 +271,7 @@ class PatchGAN_NLayer(nn.Module) :
                                    'instance' or 'batch').
             input_shape :          Shape of the input tensor (input image).
         """
-        super(PatchGAN_general, self).__init__()
+        super(PatchGAN_NLayer, self).__init__()
 
         # Parameters for convolutional layers
         ks = 4                    # Kernel size
@@ -223,21 +283,27 @@ class PatchGAN_NLayer(nn.Module) :
 
         # Build up layers sequentially
         net_list = [nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
-                               kernel_size=ks, stride=s, padding=pads),
+                               kernel_size=ks, stride=s, padding=pads, bias=use_bias),
                     nn.LeakyReLU(0.2, True)]
+        out_shape = conv_out_shape(input_shape, kernel_size=ks, stride=s, padding=pads)
 
         # Add middle layers
         for i in range(1, n_layers) :
             in_channels = n_filters * (2 ** (i - 1))
             out_filters = n_filters * (2 ** i)
             net_list += [nn.Conv3d(in_channels=in_channels, out_channels=out_filters,
-                                   kernel_size=ks, stride=s, padding=pads),
+                                   kernel_size=ks, stride=s, padding=pads, bias=use_bias),
                          normfunc(out_filters, affine=False),
                          nn.LeakyReLU(0.2, True)]
+            # Calculate shape of output tensor from this layer
+            out_shape = conv_out_shape(out_shape, kernel_size=ks, stride=s, padding=pads)
 
         # Add final conv layer
         net_list += [nn.Conv3d(in_channels=out_filters, out_channels=1,
-                               kernel_size=[16, 18,  18], stride=s, padding=0, bias=True)]
+                               kernel_size=[16, 18,  18], stride=s, padding=0, bias=use_bias)]
+        out_shape = conv_out_shape(out_shape, kernel_size=ks, stride=s, padding=pads)
+
+
 
         self.net = nn.Sequential(*net_list)
 

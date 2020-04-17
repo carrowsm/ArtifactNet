@@ -133,6 +133,8 @@ class UNet3D(nn.Module):
         dec1 = self.decoder1(dec1)                         # (N, 64, 20, 300, 300)
         # return torch.sigmoid(self.conv(dec1))              # (N, 1, 20, 300, 300)
         return self.conv(dec1)
+
+        
     @staticmethod
     def conv_relu(in_channels, features, name):
         '''Perform:

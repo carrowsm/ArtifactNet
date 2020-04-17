@@ -33,7 +33,7 @@ from config import get_args
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
 from models.generators import UNet3D
-from models.discriminators import PatchGAN_3D, CNN_3D
+from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer
 from util.helper_functions import set_requires_grad
 from util.loggers import TensorBoardCustom
 
@@ -78,8 +78,8 @@ class GAN(pl.LightningModule) :
         self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_3D(input_channels=1, out_size=1, n_filters=64)
-        self.d_x = CNN_3D(input_channels=1, out_size=1, n_filters=64)
+        self.d_y = CNN_NLayer(input_channels=1, out_size=1, n_filters=64, n_layers=3)
+        self.d_x = CNN_NLayer(input_channels=1, out_size=1, n_filters=64, n_layers=3)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -324,8 +324,8 @@ def main(hparams):
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         # accumulate_grad_batches=10,
-                         gradient_clip_val=0.0,
+                         accumulate_grad_batches=10,
+                         gradient_clip_val=0.5,
                          max_nb_epochs=2,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=4,
