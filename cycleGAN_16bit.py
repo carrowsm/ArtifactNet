@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
 
-from config import get_args
+from config.options import get_args
 
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
@@ -252,7 +252,7 @@ class GAN(pl.LightningModule) :
             # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
-            D_loss = (loss_Dy + loss_Dx)
+            D_loss = (loss_Dy + loss_Dx) * 2.0
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -302,9 +302,9 @@ class GAN(pl.LightningModule) :
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
 
         # Decay generator learning rate by factor of 10 after 1 epoch
-        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[1, 2, 3], gamma=0.5)
+        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[50, 100], gamma=0.5)
         # Increase discriminator learning rate by factor of 5 every epoch
-        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[1, 2, 3], gamma=0.5)
+        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[50, 100], gamma=0.5)
         return [opt_g, opt_d], [scheduler_g, scheduler_d]
 
 
@@ -325,10 +325,10 @@ def main(hparams):
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
                          # accumulate_grad_batches=10,
-                         gradient_clip_val=0.9,
-                         # max_nb_epochs=2,
+                         # gradient_clip_val=0.9,
+                         max_nb_epochs=hparams.max_num_epochs,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
-                         gpus=4,
+                         gpus=1,
                          distributed_backend="dp"
                          )
 

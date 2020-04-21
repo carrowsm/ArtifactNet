@@ -24,6 +24,8 @@ parser.add_argument("--b2", type=float, default=0.999,
                     help="adam: decay of first order momentum of gradient")
 parser.add_argument("--augmentation_factor", type=int, default=1,
                      help="Factor by which to augment the data with random transforms.")
+parser.add_argument("--max_num_epochs", type=int, default=100,
+                    help="Maximum number of epochs to train for.")
 
 
 # Helper function to get arguments in other scripts
