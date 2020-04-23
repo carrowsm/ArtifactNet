@@ -243,6 +243,7 @@ class CNN_NLayer(nn.Module) :
         self.fc_in_size = int(np.prod(out_shape)) * out_filters # Length of flattened array from last conv layer
         self.fc = nn.Linear(in_features=self.fc_in_size, out_features=1, bias=use_bias)
         self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax()
 
         self.net = nn.Sequential(*net_list)
 
@@ -252,7 +253,7 @@ class CNN_NLayer(nn.Module) :
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, self.fc_in_size)
         X = self.fc(X)
-        # X = self.sigmoid(X)
+        X = self.softmax(X)
 
         return X
 
