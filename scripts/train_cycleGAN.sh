@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH -t 0-01:00:00
-#SBATCH --mem=220G
+#SBATCH -t 0-02:00:00
+#SBATCH --mem=100G
 #SBATCH -J ArtifactNet
 #SBATCH -c 10
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 #SBATCH --output=DA_removal_GAN.out
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node=4
 
 
 echo 'Starting Shell Script'
@@ -17,7 +17,6 @@ source /cluster/home/carrowsm/.bashrc
 conda activate DAnet
 
 # Change working directory to top of module
-pwd
 cd ../
 
 # Python script we are running
@@ -31,7 +30,7 @@ log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=1                             # Batch size for trainer
+batch_size=4                             # Batch size for trainer
 aug_factor=1                             # Number of times to augment each image
 
 

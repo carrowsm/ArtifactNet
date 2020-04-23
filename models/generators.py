@@ -131,10 +131,10 @@ class UNet3D(nn.Module):
         dec1 = self.upconv1(dec2)                          # (N, 64, 20, 300, 300)
         dec1 = torch.cat((dec1, enc1), dim=1)              # (N, 128, 20, 300, 300)
         dec1 = self.decoder1(dec1)                         # (N, 64, 20, 300, 300)
-        # return torch.sigmoid(self.conv(dec1))              # (N, 1, 20, 300, 300)
+        # return torch.sigmoid(self.conv(dec1))            # (N, 1, 20, 300, 300)
         return self.conv(dec1)
 
-        
+
     @staticmethod
     def conv_relu(in_channels, features, name):
         '''Perform:
@@ -175,3 +175,126 @@ class UNet3D(nn.Module):
                 ]
             )
         )
+
+
+class ResNetK(nn.Module):
+    """A generator following the ResNet architecture with K residual
+    blocks."""
+    def __init__(self, in_channels=1, out_channels=1, n_filters=64, n_layers=4, norm_layer=nn.InstanceNorm3d,
+                 use_bias=True, use_dropout=False, n_blocks=6, padding_type='reflect'):
+        """Construct a Resnet-based generator
+        Parameters:
+            input_nc (int)      -- the number of channels in input images
+            output_nc (int)     -- the number of channels in output images
+            n_filters (int)           -- the number of filters in the last conv layer
+            norm_layer          -- normalization layer
+            use_dropout (bool)  -- if use dropout layers
+            n_blocks (int)      -- the number of ResNet blocks
+            padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+        """
+        super(ResNetK, self).__init__()
+
+        """c7s1-64,d128,d256,R256,R256,R256, R256,R256,R256,R256,R256,R256,u128, u64,c7s1-3"""
+
+        # Add first convolutional layer
+        net = [nn.ReplicationPad3d(3),
+                 nn.Conv3d(in_channels, n_filters, kernel_size=7, padding=0, bias=use_bias),
+                 norm_layer(n_filters),
+                 nn.ReLU(True)]
+
+        # Add two downsampling layers
+        for i in range(2):  # add downsampling layers
+            mult = 2 ** i
+            net += [nn.Conv3d(n_filters * mult, n_filters * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+                      norm_layer(n_filters * mult * 2),
+                      nn.ReLU(True)]
+        # Add K residual layers
+        for i in range(n_blocks) :
+            net += [ResNetBlock(n_filters * (2 ** 2), padding_type='zero',
+                                norm_layer=norm_layer, use_dropout=use_dropout,
+                                use_bias=use_bias)]
+
+        # Add two Upsampling layers
+        for i in range(2):
+            mult = 2 ** (2 - i)
+            net += [nn.ConvTranspose3d(n_filters * mult, int(n_filters * mult / 2),
+                                         kernel_size=3, stride=2,
+                                         padding=1, output_padding=1,
+                                         bias=use_bias),
+                      norm_layer(int(n_filters * mult / 2)),
+                      nn.ReLU(True)]
+
+        # Add output block
+        net += [nn.ReplicationPad3d(3)]
+        net += [nn.Conv3d(n_filters, out_channels, kernel_size=7, padding=0)]
+        net += [nn.Tanh()]
+
+        self.net = nn.Sequential(*net)
+
+    def forward(self, X) :
+        out = self.net(X)
+        return X + out
+
+
+class ResNetBlock(nn.Module):
+    """
+    A single residual convolutional block. This roughly follows the
+    structure by Zhu et al in cycleGAN (https://arxiv.org/pdf/1703.10593.pdf).
+    Parameters:
+        channels (int)      -- the number of channels in the conv layer.
+        padding_type (str)  -- the name of padding layer: reflect | replicate | zero
+        norm_layer          -- normalization layer
+        use_dropout (bool)  -- if use dropout layers.
+        use_bias (bool)     -- if the conv layer uses bias or not
+    """
+    def __init__(self, channels, padding_type='zero', norm_layer=nn.InstanceNorm3d,
+                 use_dropout=False, use_bias=True):
+        super(ResNetBlock, self).__init__()
+
+        # Create a list of convolutional blocks
+        res_block = []
+
+        # Create padding layer
+        p_layer, p = self.get_padding(padding_type)
+
+        # Add padding layer
+        res_block += p_layer
+
+        # Add convolutional layer
+        res_block += [nn.Conv3d(channels, channels, kernel_size=3,
+                                 padding=p, bias=use_bias),
+                       norm_layer(channels), nn.ReLU(True)]
+
+        # Add dropout, if needed
+        if use_dropout:
+            res_block += [nn.Dropout(0.5)]
+
+        # Add another padding layer
+        res_block += p_layer
+
+        # Add another conv layer
+        res_block += [nn.Conv3d(channels, channels, kernel_size=3,
+                                 padding=p, bias=use_bias),
+                       norm_layer(channels), nn.ReLU(True)]
+
+        self.res_block = nn.Sequential(*res_block)
+
+    def get_padding(self, padding_type):
+        """ Takes the input padding type and returns the appropiate padding
+        layer and the ammount of padding to use in convolutional layer"""
+        p, p_layer = 0, []            # Ammount of padding and type of layer
+        if padding_type == 'reflect':
+            p_layer = [nn.ReplicationPad3d(1)]
+        elif padding_type == 'replicate':
+            p_layer = [nn.ReplicationPad3d(1)]
+        elif padding_type == 'zero':  # If using 'zero', don't add padding layer
+            p = 1
+        else:
+            raise NotImplementedError(f"padding {padding_type} is not implemented")
+        return p_layer, p
+
+    def forward(self, X) :
+        """ Add skip connection around the two convolutions"""
+        # X = X + self.res_block(X)
+        X = self.res_block(X)
+        return X

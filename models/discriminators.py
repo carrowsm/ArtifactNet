@@ -197,7 +197,7 @@ class PatchGAN_3D(nn.Module) :
 
 class CNN_NLayer(nn.Module) :
     """A 3D CNN with variable depth"""
-    def __init__(self, input_channels=1, out_size=1, n_filters=64, n_layers=4, norm="instance",
+    def __init__(self, input_channels=1, out_channels=1, n_filters=64, n_layers=4, norm="instance",
                  input_shape=[20, 300, 300]):
         """
         Parameters:
@@ -217,7 +217,7 @@ class CNN_NLayer(nn.Module) :
         # Parameters for convolutional layers
         ks = 4             # Kernel size
         pads = 1           # Padding size
-        s = [1, 2, 2]      # Convolution stride
+        s = [2, 2, 2]      # Convolution stride
         use_bias = True
         normfunc = nn.InstanceNorm3d
 
@@ -239,17 +239,21 @@ class CNN_NLayer(nn.Module) :
             out_shape = conv_out_shape(out_shape, kernel_size=ks, stride=s, padding=pads)
 
 
-        # Add final conv layer
-        self.fc_in_size = int(np.prod(out_shape))  # Length of flattened array from last conv layer
+        # Create final conv layer
+        self.fc_in_size = int(np.prod(out_shape)) * out_filters # Length of flattened array from last conv layer
         self.fc = nn.Linear(in_features=self.fc_in_size, out_features=1, bias=use_bias)
+        self.sigmoid = nn.Sigmoid()
 
         self.net = nn.Sequential(*net_list)
 
     def forward(self, X) :
         X = self.net(X)
+
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, self.fc_in_size)
         X = self.fc(X)
+        # X = self.sigmoid(X)
+
         return X
 
 
