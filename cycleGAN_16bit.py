@@ -32,8 +32,8 @@ from config.options import get_args
 
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
-from models.generators import UNet3D, ResNetK
-from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer
+from models.generators import UNet3D, ResNetK, UNet2D
+from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer, CNN_2D
 from util.helper_functions import set_requires_grad
 from util.loggers import TensorBoardCustom
 
@@ -68,19 +68,19 @@ in each class. For these we use the patchGAN discriminator architecture.
 """ MAIN PYTORCH-LIGHTNING MODULE """
 class GAN(pl.LightningModule) :
 
-    def __init__(self, hparams, image_size=[16, 256, 256]):
+    def __init__(self, hparams, image_size=[1, 256, 256]):
         super(GAN, self).__init__()
         self.hparams = hparams
         self.image_size = image_size
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        self.g_y = ResNetK(in_channels=1, out_channels=1, n_filters=64, n_blocks=3)
-        self.g_x = ResNetK(in_channels=1, out_channels=1, n_filters=64, n_blocks=3)
+        self.g_y = UNet2D(in_channels=1, out_channels=1, init_features=64)
+        self.g_x = UNet2D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=5, input_shape=image_size)
-        self.d_x = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=5, input_shape=image_size)
+        self.d_y = CNN_2D(output_dim=1)
+        self.d_x = CNN_2D(output_dim=1)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -139,10 +139,12 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=self.y_train[:, 0], # DA slice index
                                   Y_image_centre=self.n_train[:, 0], # Mouth slice index
                                   image_size=self.image_size,
-                                  transform=None)
+                                  transform=None,
+                                  dim="2D"
+                                  )
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=10, drop_last=True
+                                 shuffle=True, num_workers=1, drop_last=True
                                  )
         self.dataset_size = len(dataset)
 
@@ -310,7 +312,7 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[16, 256, 256])
+    model = GAN(hparams, image_size=[2, 256, 256])
     # model = GAN(hparams, image_size=[20, 300, 300])
 
 
@@ -318,16 +320,16 @@ def main(hparams):
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px")
+    logger = TensorBoardCustom(hparams.log_dir, name="1_256_256px")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
                          accumulate_grad_batches=4,
                          gradient_clip_val=0.9,
                          max_nb_epochs=hparams.max_num_epochs,
-                         # amp_level='O1', precision=16, # Enable 16-bit presicion
-                         gpus=4,
-                         distributed_backend="dp"
+                         # amp_level='O2', precision=16, # Enable 16-bit presicion
+                         gpus=1,
+                         # distributed_backend="dp"
                          )
 
     # ------------------------

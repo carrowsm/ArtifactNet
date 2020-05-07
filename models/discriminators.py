@@ -23,7 +23,7 @@ def conv_out_shape(in_shape, kernel_size=[4,4,4], stride=1, padding=0, dilation=
 
 class CNN_2D(nn.Module):
     def __init__(self, output_dim=1):
-        super(Discriminator, self).__init__()
+        super(CNN_2D, self).__init__()
 
         """ Use architecture from Mattea's DA detection paper """
         # PyTorch's conv2d takes the following form:
@@ -60,6 +60,7 @@ class CNN_2D(nn.Module):
         # self.linear.requires_grad = True
 
     def forward(self, X):
+        print(X.shape)
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
         print(X.shape)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))

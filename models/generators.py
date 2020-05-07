@@ -54,74 +54,74 @@ class UNet2D(nn.Module):
         ### ------- ###
 
 
-        def forward(self, x):
-            enc1 = self.encoder1(x)                            # (N, 64, 512, 512)
-            enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 10, 150, 150)
-            enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 5, 75, 75)
-            enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 3, 38, 38)
+    def forward(self, x):
+        enc1 = self.encoder1(x)                            # (N, 64, 512, 512)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 10, 150, 150)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 5, 75, 75)
+        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 3, 38, 38)
 
-            bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 1, 19, 19)
+        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 1, 19, 19)
 
-            x = self.upconv4(bottleneck)                       # (N, 512, 3, 38, 38)
-            x = torch.cat((x, enc4), dim=1)                    # (N, 1024, 3, 38, 38)
-            x = self.decoder4(dec4)                            # (N, 512, 3, 38, 38)
+        x = self.upconv4(bottleneck)                       # (N, 512, 3, 38, 38)
+        x = torch.cat((x, enc4), dim=1)                    # (N, 1024, 3, 38, 38)
+        x = self.decoder4(dec4)                            # (N, 512, 3, 38, 38)
 
-            x = self.upconv3(dec4)                             # (N, 256, 5, 75, 75)
-            x = torch.cat((x, enc3), dim=1)                    # (N, 512, 5, 75, 75)
-            x = self.decoder3(dec3)                            # (N, 256, 5, 75, 75)
+        x = self.upconv3(dec4)                             # (N, 256, 5, 75, 75)
+        x = torch.cat((x, enc3), dim=1)                    # (N, 512, 5, 75, 75)
+        x = self.decoder3(dec3)                            # (N, 256, 5, 75, 75)
 
-            x = self.upconv2(dec3)                             # (N, 128, 10, 150, 150)
-            x = torch.cat((x, enc2), dim=1)                    # (N, 256, 10, 150, 150)
-            x = self.decoder2(dec2)                            # (N, 128, 10, 150, 150)
+        x = self.upconv2(dec3)                             # (N, 128, 10, 150, 150)
+        x = torch.cat((x, enc2), dim=1)                    # (N, 256, 10, 150, 150)
+        x = self.decoder2(dec2)                            # (N, 128, 10, 150, 150)
 
-            x = self.upconv1(dec2)                             # (N, 64, 20, 300, 300)
-            x = torch.cat((x, enc1), dim=1)                    # (N, 128, 20, 300, 300)
-            x = self.decoder1(dec1)                            # (N, 64, 20, 300, 300)
-            # return torch.sigmoid(self.conv(dec1))            # (N, 1, 20, 300, 300)
-            return self.conv(dec1)
+        x = self.upconv1(dec2)                             # (N, 64, 20, 300, 300)
+        x = torch.cat((x, enc1), dim=1)                    # (N, 128, 20, 300, 300)
+        x = self.decoder1(dec1)                            # (N, 64, 20, 300, 300)
+        # return torch.sigmoid(self.conv(dec1))            # (N, 1, 20, 300, 300)
+        return self.conv(dec1)
 
 
-        @staticmethod
-        def conv_relu(in_channels, features, name):
-            '''Perform:
-            1. 3d convolution, kernel=3, padding=1, so output_size=input_size
-            2. Batch normalization
-            3. Relu
-            4. Another convolution, with same input and output size
-            5. batch normalization
-            6. Relu'''
-            # normfunc = nn.InstanceNorm3d
-            normfunc = nn.BatchNorm2d
-            return nn.Sequential(
-                OrderedDict(
-                    [
-                        (
-                            name + "conv1",
-                            nn.Conv2d(
-                                in_channels=in_channels,
-                                out_channels=features,
-                                kernel_size=3,
-                                padding=0,
-                                bias=False,
-                            ),
+    @staticmethod
+    def conv_relu(in_channels, features, name):
+        '''Perform:
+        1. 3d convolution, kernel=3, padding=1, so output_size=input_size
+        2. Batch normalization
+        3. Relu
+        4. Another convolution, with same input and output size
+        5. batch normalization
+        6. Relu'''
+        # normfunc = nn.InstanceNorm3d
+        normfunc = nn.BatchNorm2d
+        return nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        name + "conv1",
+                        nn.Conv2d(
+                            in_channels=in_channels,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=0,
+                            bias=False,
                         ),
-                        (name + "norm1", normfunc(num_features=features)),
-                        (name + "relu1", nn.LeakyReLU(0.2, inplace=True)),
-                        (
-                            name + "conv2",
-                            nn.Conv2d(
-                                in_channels=features,
-                                out_channels=features,
-                                kernel_size=3,
-                                padding=0,
-                                bias=False,
-                            ),
+                    ),
+                    (name + "norm1", normfunc(num_features=features)),
+                    (name + "relu1", nn.LeakyReLU(0.2, inplace=True)),
+                    (
+                        name + "conv2",
+                        nn.Conv2d(
+                            in_channels=features,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=0,
+                            bias=False,
                         ),
-                        (name + "norm2", normfunc(num_features=features)),
-                        (name + "relu2", nn.LeakyReLU(0.2, inplace=True)),
-                    ]
-                )
+                    ),
+                    (name + "norm2", normfunc(num_features=features)),
+                    (name + "relu2", nn.LeakyReLU(0.2, inplace=True)),
+                ]
             )
+        )
 
 # class UNet2D(nn.Module) :
 #     """ Use the original U-Net architecture from the original paper:

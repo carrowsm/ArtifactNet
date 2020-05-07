@@ -107,9 +107,6 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", suffix="", dat
 
 
 
-
-
-
 class UnpairedDataset(t_data.Dataset):
     """
     Image dataset for ArtifactNet artifact removal GAN.
@@ -163,8 +160,10 @@ class UnpairedDataset(t_data.Dataset):
                  Y_image_centre=None,
                  file_type="nrrd",
                  image_size=None,
-                 transform=None):
+                 transform=None,
+                 dim="3D"):
 
+        self.dim          = dim
         # self.root_dir     = image_root_dir
         self.x_img_paths  = X_image_names # Paths to images in domain X
         self.y_img_paths  = Y_image_names # Paths to images in domain Y
@@ -247,7 +246,10 @@ class UnpairedDataset(t_data.Dataset):
         zs, ys, xs = size[0] // 2, size[1] // 2, size[2] // 2
         # Get coordinates of pixel around which to crop
         z, y, x = p[0], p[1], p[2]
-        return Z[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
+        if self.dim == "2D" :
+            return Z[z, y-ys : y+ys, x-xs : x+xs]
+        else :
+            return Z[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
     """ ########################## """
 
 
@@ -303,9 +305,16 @@ class UnpairedDataset(t_data.Dataset):
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
         try :
-            X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-            Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+            if self.dim == "2D" :
+                print(X_tensor.shape)
+                X_tensor = X_tensor.reshape(1, self.image_size[1], self.image_size[2])
+                print(X_tensor.shape)
+                Y_tensor = Y_tensor.reshape(1, self.image_size[1], self.image_size[2])
+            else :
+                X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+                Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
         except :
+            print("image not found")
             i = np.random.randint(0, self.x_size - 1)
             return self[i]
 
