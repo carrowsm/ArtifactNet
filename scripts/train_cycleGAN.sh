@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 0-02:00:00
-#SBATCH --mem=100G
+#SBATCH --mem=220G
 #SBATCH -J ArtifactNet
 #SBATCH -c 10
 #SBATCH -N 1

@@ -56,20 +56,28 @@ class CNN_2D(nn.Module):
 
         self.sigmoid = torch.nn.Sigmoid()
 
-        self.linear = nn.Linear(300*300, output_dim)
-        self.linear.requires_grad = True
+        # self.linear = nn.Linear(300*300, output_dim)
+        # self.linear.requires_grad = True
 
     def forward(self, X):
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
+        print(X.shape)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
+        print(X.shape)
         X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
+        print(X.shape)
         X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
+        print(X.shape)
         X = self.conv5_bn(self.LRelu(self.conv5(X)))
+        print(X.shape)
         X = self.avgPool(X)
+        print(X.shape)
 
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, 64 * 9 * 9)
+        print(X.shape)
         X = self.fc3(X)
+        print(X.shape)
 
         # Constrain output of model to (0, 1)
         X = self.sigmoid(X)
@@ -151,7 +159,7 @@ class PatchGAN_3D(nn.Module) :
                                kernel_size=ks, stride=s, padding=pads, bias=use_bias)
         self.conv3 = nn.Conv3d(in_channels=n_filters * 2, out_channels=n_filters * 4,
                                kernel_size=ks, stride=s, padding=pads, bias=use_bias)
-        self.conv4 = nn.Conv3d(in_channels=n_filters * 4, out_channels=n_filters * 8,
+        self.conv4 = nn.Conv3d(in_channels=n4_filters * 4, out_channels=n_filters * 8,
                                kernel_size=ks, stride=s, padding=pads, bias=use_bias)
 
         self.convf = nn.Conv3d(in_channels=n_filters * 8, out_channels=1,
@@ -217,9 +225,9 @@ class CNN_NLayer(nn.Module) :
         # Parameters for convolutional layers
         ks = 4             # Kernel size
         pads = 1           # Padding size
-        s = [2, 2, 2]      # Convolution stride
+        s = [1, 2, 2]      # Convolution stride
         use_bias = True
-        normfunc = nn.InstanceNorm3d
+        normfunc = nn.BatchNorm3d
 
 
         # Create first convolutional layer
@@ -230,8 +238,8 @@ class CNN_NLayer(nn.Module) :
 
         # Add middle layers
         for i in range(1, n_layers) :
-            in_channels = n_filters * (2 ** (i - 1))
-            out_filters = n_filters * (2 ** i)
+            in_channels = min(n_filters * (2 ** (i - 1)), 512)
+            out_filters = min(n_filters * (2 ** i), 512)
             net_list += [nn.Conv3d(in_channels=in_channels, out_channels=out_filters,
                                    kernel_size=ks, stride=s, padding=pads),
                          normfunc(out_filters, affine=False),
@@ -242,8 +250,9 @@ class CNN_NLayer(nn.Module) :
         # Create final conv layer
         self.fc_in_size = int(np.prod(out_shape)) * out_filters # Length of flattened array from last conv layer
         self.fc = nn.Linear(in_features=self.fc_in_size, out_features=1, bias=use_bias)
+
         self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=None)
 
         self.net = nn.Sequential(*net_list)
 
@@ -253,7 +262,7 @@ class CNN_NLayer(nn.Module) :
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, self.fc_in_size)
         X = self.fc(X)
-        X = self.softmax(X)
+        X = self.sigmoid(X)
 
         return X
 

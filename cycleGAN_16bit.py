@@ -79,8 +79,8 @@ class GAN(pl.LightningModule) :
         self.g_x = ResNetK(in_channels=1, out_channels=1, n_filters=64, n_blocks=3)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=4, input_shape=image_size)
-        self.d_x = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=4, input_shape=image_size)
+        self.d_y = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=5, input_shape=image_size)
+        self.d_x = CNN_NLayer(input_channels=1, out_channels=1, n_filters=64, n_layers=5, input_shape=image_size)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -249,7 +249,7 @@ class GAN(pl.LightningModule) :
             # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
-            D_loss = (loss_Dy + loss_Dx) * 2.0
+            D_loss = (loss_Dy + loss_Dx)
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
