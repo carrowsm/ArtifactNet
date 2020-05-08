@@ -270,10 +270,10 @@ class GAN(pl.LightningModule) :
                 # Generate some fake images to plot
                 gen_y = self.g_y(x)
                 gen_x = self.g_x(y)
-                images = [    x[0, 0, 10, :, :].cpu(),
-                              y[0, 0, 10, :, :].cpu(),
-                          gen_x[0, 0, 10, :, :].cpu(),
-                          gen_y[0, 0, 10, :, :].cpu()]
+                images = [    x[0, 0, :, :].cpu(),
+                              y[0, 0, :, :].cpu(),
+                          gen_x[0, 0, :, :].cpu(),
+                          gen_y[0, 0, :, :].cpu()]
 
             # Plot the image
             self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, batch_nb)
@@ -312,7 +312,7 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[2, 256, 256])
+    model = GAN(hparams, image_size=[1, 256, 256])
     # model = GAN(hparams, image_size=[20, 300, 300])
 
 
@@ -327,7 +327,7 @@ def main(hparams):
                          accumulate_grad_batches=4,
                          gradient_clip_val=0.9,
                          max_nb_epochs=hparams.max_num_epochs,
-                         # amp_level='O2', precision=16, # Enable 16-bit presicion
+                         # amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=1,
                          # distributed_backend="dp"
                          )

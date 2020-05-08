@@ -50,7 +50,7 @@ class CNN_2D(nn.Module):
 
         self.avgPool = nn.AvgPool2d(2, 2)
 
-        self.fc3 = nn.Linear(64 * 9 * 9, output_dim)
+        self.fc3 = nn.Linear(64 * 8 * 8, output_dim)
 
         self.softmax = torch.nn.Softmax(dim=1)
 
@@ -60,25 +60,25 @@ class CNN_2D(nn.Module):
         # self.linear.requires_grad = True
 
     def forward(self, X):
-        print(X.shape)
+        # print(X.shape)
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
-        print(X.shape)
+        # print(X.shape)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
-        print(X.shape)
+        # print(X.shape)
         X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
-        print(X.shape)
+        # print(X.shape)
         X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
-        print(X.shape)
+        # print(X.shape)
         X = self.conv5_bn(self.LRelu(self.conv5(X)))
-        print(X.shape)
+        # print(X.shape)
         X = self.avgPool(X)
-        print(X.shape)
+        # print(X.shape)
 
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
-        X = X.view(-1, 64 * 9 * 9)
-        print(X.shape)
+        X = X.view(-1, 64 * 8 * 8)
+        # print(X.shape)
         X = self.fc3(X)
-        print(X.shape)
+        # print(X.shape)
 
         # Constrain output of model to (0, 1)
         X = self.sigmoid(X)

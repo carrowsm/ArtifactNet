@@ -306,9 +306,7 @@ class UnpairedDataset(t_data.Dataset):
         # Reshape the arrays to add another dimension
         try :
             if self.dim == "2D" :
-                print(X_tensor.shape)
                 X_tensor = X_tensor.reshape(1, self.image_size[1], self.image_size[2])
-                print(X_tensor.shape)
                 Y_tensor = Y_tensor.reshape(1, self.image_size[1], self.image_size[2])
             else :
                 X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
@@ -319,7 +317,7 @@ class UnpairedDataset(t_data.Dataset):
             return self[i]
 
 
-        return X_tensor, Y_tensor
+        return X_tensor.to(torch.float32), Y_tensor.to(torch.float32)
 
 
     def __len__(self):

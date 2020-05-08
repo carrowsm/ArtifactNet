@@ -38,7 +38,7 @@ class UNet2D(nn.Module):
         self.bottleneck = self.conv_relu(features * 8, features * 16, name="bottleneck")
 
         ### DECODER ###
-        self.upconv4 = nn.ConvTranspose2d(features * 16, features * 8, kernel_size=2, stride=2)
+        self.upconv4 = nn.ConvTranspose2d(features * 16, features * 8, kernel_size=2, stride=2, padding=0)
         self.decoder4 = self.conv_relu((features * 8) * 2, features * 8, name="dec4")
 
         self.upconv3 = nn.ConvTranspose2d(features * 8, features * 4, kernel_size=2, stride=2)
@@ -54,31 +54,28 @@ class UNet2D(nn.Module):
         ### ------- ###
 
 
-    def forward(self, x):
-        enc1 = self.encoder1(x)                            # (N, 64, 512, 512)
-        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 10, 150, 150)
-        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 5, 75, 75)
-        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 3, 38, 38)
+    def forward(self, x):                                  # (N, 1, 256, 256)
+        enc1 = self.encoder1(x)                            # (N, 64, 256, 256)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128, 128, 128)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256, 64, 64)
+        enc4 = self.encoder4(self.pool3(enc3))             # (N, 512, 32, 32)
 
-        bottleneck = self.bottleneck(self.pool4(enc4))     # (N, 1024, 1, 19, 19)
+        x = self.bottleneck(self.pool4(enc4))              # (N, 1024, 16, 16)
 
-        x = self.upconv4(bottleneck)                       # (N, 512, 3, 38, 38)
-        x = torch.cat((x, enc4), dim=1)                    # (N, 1024, 3, 38, 38)
-        x = self.decoder4(dec4)                            # (N, 512, 3, 38, 38)
-
-        x = self.upconv3(dec4)                             # (N, 256, 5, 75, 75)
-        x = torch.cat((x, enc3), dim=1)                    # (N, 512, 5, 75, 75)
-        x = self.decoder3(dec3)                            # (N, 256, 5, 75, 75)
-
-        x = self.upconv2(dec3)                             # (N, 128, 10, 150, 150)
-        x = torch.cat((x, enc2), dim=1)                    # (N, 256, 10, 150, 150)
-        x = self.decoder2(dec2)                            # (N, 128, 10, 150, 150)
-
-        x = self.upconv1(dec2)                             # (N, 64, 20, 300, 300)
-        x = torch.cat((x, enc1), dim=1)                    # (N, 128, 20, 300, 300)
-        x = self.decoder1(dec1)                            # (N, 64, 20, 300, 300)
-        # return torch.sigmoid(self.conv(dec1))            # (N, 1, 20, 300, 300)
-        return self.conv(dec1)
+        x = self.upconv4(x)                                # (N,  512, 32, 32)
+        x = torch.cat((x, enc4), dim=1)                    # (N, 1024, 32, 32)
+        x = self.decoder4(x)                               # (N,  512, 32, 32)
+        x = self.upconv3(x)                                # (N,  256, 64, 64)
+        x = torch.cat((x, enc3), dim=1)                    # (N,  512, 64, 64)
+        x = self.decoder3(x)                               # (N,  256, 64, 64)
+        x = self.upconv2(x)                                # (N,  128, 128, 128)
+        x = torch.cat((x, enc2), dim=1)                    # (N,  256, 128, 128)
+        x = self.decoder2(x)                               # (N,  128, 128, 128)
+        x = self.upconv1(x)                                # (N,   64, 256, 256)
+        x = torch.cat((x, enc1), dim=1)                    # (N,  128, 256, 256)
+        x = self.decoder1(x)                               # (N,   64, 256, 256)
+        # return torch.sigmoid(self.conv(dec1))            # (N,    1, 256, 256)
+        return self.conv(x)
 
 
     @staticmethod
@@ -101,7 +98,7 @@ class UNet2D(nn.Module):
                             in_channels=in_channels,
                             out_channels=features,
                             kernel_size=3,
-                            padding=0,
+                            padding=1,
                             bias=False,
                         ),
                     ),
@@ -113,7 +110,7 @@ class UNet2D(nn.Module):
                             in_channels=features,
                             out_channels=features,
                             kernel_size=3,
-                            padding=0,
+                            padding=1,
                             bias=False,
                         ),
                     ),
