@@ -6,31 +6,6 @@ import numpy as np
 import SimpleITK as sitk
 from skimage.transform import resize
 
-
-
-def read_nrrd_image(nrrd_file_path) :
-    image = sitk.ReadImage(nrrd_file_path)
-
-    imageArray = sitk.GetArrayFromImage(image)
-
-    return imageArray
-
-
-
-def read_dicom_image(dicom_path) :
-    """Return SITK image given the absolute path
-    to a DICOM series."""
-    reader = sitk.ImageSeriesReader()
-    # path is the directory of the dicom folder
-    dicom_names = reader.GetGDCMSeriesFileNames(dicom_path)
-    reader.SetFileNames(dicom_names)
-    image = reader.Execute()
-
-    imageArray = sitk.GetArrayFromImage(image)
-
-    return imageArray
-
-
 def resample_image(image, new_spacing=[1,1,1]):
 
     #Resample image to common resolution of 1x1x1
@@ -58,5 +33,36 @@ def resample_image(image, new_spacing=[1,1,1]):
     #Resample image and generate numpy array from image
     resampledImage = rif.Execute(image)
     imageArray = sitk.GetArrayFromImage(resampledImage)
+
+    return imageArray
+
+
+
+def read_nrrd_image(nrrd_file_path) :
+    image = sitk.ReadImage(nrrd_file_path)
+
+    # Resize the image
+    resamp_img = resample_image(image, new_spacing=[1,1,1])
+
+    imageArray = sitk.GetArrayFromImage(image)
+
+    return imageArray
+
+
+
+def read_dicom_image(dicom_path) :
+    """Return SITK image given the absolute path
+    to a DICOM series."""
+    reader = sitk.ImageSeriesReader()
+    # path is the directory of the dicom folder
+    dicom_names = reader.GetGDCMSeriesFileNames(dicom_path)
+    reader.SetFileNames(dicom_names)
+    image = reader.Execute()
+
+    # Resize the image
+    resamp_img = resample_image(image, new_spacing=[1,1,1])
+
+    # Comvert image to np array
+    imageArray = sitk.GetArrayFromImage(resamp_img)
 
     return imageArray

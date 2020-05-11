@@ -75,12 +75,12 @@ class GAN(pl.LightningModule) :
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        self.g_y = UNet2D(in_channels=1, out_channels=1, init_features=64)
-        self.g_x = UNet2D(in_channels=1, out_channels=1, init_features=64)
+        self.g_y = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
+        self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_2D(output_dim=1)
-        self.d_x = CNN_2D(output_dim=1)
+        self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
+        self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -328,7 +328,7 @@ def main(hparams):
                          gradient_clip_val=0.9,
                          max_nb_epochs=hparams.max_num_epochs,
                          # amp_level='O1', precision=16, # Enable 16-bit presicion
-                         gpus=1,
+                         gpus=hparams.n_gpus,
                          # distributed_backend="dp"
                          )
 

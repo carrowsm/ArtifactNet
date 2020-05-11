@@ -246,7 +246,7 @@ class UnpairedDataset(t_data.Dataset):
         zs, ys, xs = size[0] // 2, size[1] // 2, size[2] // 2
         # Get coordinates of pixel around which to crop
         z, y, x = p[0], p[1], p[2]
-        if self.dim == "2D" :
+        if self.image_size[0] == 1 :
             return Z[z, y-ys : y+ys, x-xs : x+xs]
         else :
             return Z[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
@@ -289,14 +289,9 @@ class UnpairedDataset(t_data.Dataset):
         # Make datatype ints (not unsigned ints)
         X, Y = X.astype(np.int16), Y.astype(np.int16)
 
-
         # Crop the image
         X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
         Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
-
-        # Check image has the right size
-        # self.check_size(X)
-        # self.check_size(Y)
 
         # Transform the image (augmentation)
         X_tensor = self.transform(X)
@@ -317,7 +312,7 @@ class UnpairedDataset(t_data.Dataset):
             return self[i]
 
 
-        return X_tensor.to(torch.float32), Y_tensor.to(torch.float32)
+        return X_tensor, Y_tensor
 
 
     def __len__(self):

@@ -22,7 +22,7 @@ def conv_out_shape(in_shape, kernel_size=[4,4,4], stride=1, padding=0, dilation=
 
 
 class CNN_2D(nn.Module):
-    def __init__(self, output_dim=1):
+    def __init__(self, in_channels=1, out_channels=1):
         super(CNN_2D, self).__init__()
 
         """ Use architecture from Mattea's DA detection paper """
@@ -33,7 +33,7 @@ class CNN_2D(nn.Module):
         self.pool = nn.MaxPool2d(2, 2) # (kernel_size, stride)
         self.LRelu = nn.LeakyReLU(0.2)
 
-        self.conv1 = nn.Conv2d(1, 4, 5, padding=2)
+        self.conv1 = nn.Conv2d(in_channels, 4, 5, padding=2)
         self.conv1_bn = nn.BatchNorm2d(4)
 
         self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
@@ -50,35 +50,23 @@ class CNN_2D(nn.Module):
 
         self.avgPool = nn.AvgPool2d(2, 2)
 
-        self.fc3 = nn.Linear(64 * 8 * 8, output_dim)
+        self.fc3 = nn.Linear(64 * 8 * 8, out_channels)
 
         self.softmax = torch.nn.Softmax(dim=1)
 
         self.sigmoid = torch.nn.Sigmoid()
 
-        # self.linear = nn.Linear(300*300, output_dim)
-        # self.linear.requires_grad = True
-
     def forward(self, X):
-        # print(X.shape)
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
-        # print(X.shape)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X))))
-        # print(X.shape)
         X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X))))
-        # print(X.shape)
         X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X))))
-        # print(X.shape)
         X = self.conv5_bn(self.LRelu(self.conv5(X)))
-        # print(X.shape)
         X = self.avgPool(X)
-        # print(X.shape)
 
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
         X = X.view(-1, 64 * 8 * 8)
-        # print(X.shape)
         X = self.fc3(X)
-        # print(X.shape)
 
         # Constrain output of model to (0, 1)
         X = self.sigmoid(X)
