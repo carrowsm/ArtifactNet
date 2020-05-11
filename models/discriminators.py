@@ -73,6 +73,63 @@ class CNN_2D(nn.Module):
 
         return X
 
+class VGG2D(nn.Module):
+    """Implementation of 2D VGG-16 with variable depth."""
+    def __init__(self, in_channels=1, out_channels=1, n_filters=64, n_layers=5):
+        """
+        Parameters :
+            in_channels (int) :  Number of input channels to use (use this as z-axis).
+            out_channels (int) : Number of output channels for scalar output.
+            n_filters (int) :    Number of filters for first conv layer. Subsequent
+                                 layers i will use (2**i)*n_filters filters.
+            n_layers (int) :     Number of 2-convolution blocks to use. i.e. use
+                                 n_layers=5 for VGG16.
+        """
+        super(VGG2D, self).__init__()
+
+        # Define layers without learnable parameters
+        self.relu = nn.LeakyReLU(0.2)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Define sequential networks with first layer
+        net = self.conv_block(in_channels, n_filters)
+        filters = n_filters
+
+        # Define layers of VGG
+        for i in range(n_layers) :
+            in_ch = filters    # Output channels from previous block
+            filters = (2 ** i) * n_filters # Output channels from this block
+
+            # Build conv block
+            net += self.conv_block(in_ch, filters)
+
+
+        self.network = nn.Sequential(*net)
+
+    def conv_block(self, in_ch, out_ch, batch_norm=True, leaky=True) :
+        """Defines a block of 2 convolutional layers"""
+        ### First conv layer in block ###
+        block = [nn.Conv2d(in_channels=in_ch, out_channels=in_ch, kernel_size=3,
+                 stride=1, padding=1)]
+        if batch_norm :
+            block += [nn.BatchNorm2d(in_ch)]
+        block += [self.relu]
+
+        ### Second conv layer in block ###
+        block += [nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3,
+                 stride=1, padding=1)]
+        if batch_norm :
+            block += [nn.BatchNorm2d(in_ch)]
+        block += [self.relu]
+
+        return block
+
+    def forward(X) :
+        X = self.netowrk(X)
+        print(X.shape)
+        return X
+
+
 
 
 class CNN_3D(nn.Module) :
