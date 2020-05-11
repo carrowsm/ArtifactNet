@@ -33,7 +33,7 @@ from config.options import get_args
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
 from models.generators import UNet3D, ResNetK, UNet2D
-from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer, CNN_2D
+from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer, CNN_2D, VGG2D
 from util.helper_functions import set_requires_grad
 from util.loggers import TensorBoardCustom
 
@@ -46,8 +46,7 @@ on a GPU node on H4H.
 
 Papers
 -  https://junyanz.github.io/CycleGAN/
--  https://www.researchgate.net/publication/337386794_Three-dimensional_Generative_
-   Adversarial_Nets_for_Unsupervised_Metal_Artifact_Reduction
+-  https://arxiv.org/pdf/1911.08105.pdf
 
 CycleGAN Architecture:
 ---------------------
@@ -79,8 +78,8 @@ class GAN(pl.LightningModule) :
         self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
-        self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
+        self.d_y = VGG2D(in_channels=image_size[0], out_channels=1)
+        self.d_x = VGG2D(in_channels=image_size[0], out_channels=1)
         ### ------------------- ###
 
         # Put networks on GPUs

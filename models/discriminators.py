@@ -93,40 +93,47 @@ class VGG2D(nn.Module):
 
         # Define sequential networks with first layer
         net = self.conv_block(in_channels, n_filters)
+        net += [self.pool]
         filters = n_filters
 
         # Define layers of VGG
         for i in range(n_layers) :
             in_ch = filters    # Output channels from previous block
-            filters = (2 ** i) * n_filters # Output channels from this block
+            filters = min((2 ** i) * n_filters, 512) # Output channels from this block
 
             # Build conv block
-            net += self.conv_block(in_ch, filters)
-
+            net += self.conv_block(in_ch, filters) # Two conv-bnorm-relu layers
+            net += [self.pool]                      # Pooling layer
 
         self.network = nn.Sequential(*net)
+        self.fc1 = nn.Linear(filters * 4 * 4, out_channels)
+        self.softmax = nn.Softmax()
+        self.sigmoid = nn.Sigmoid()
+
 
     def conv_block(self, in_ch, out_ch, batch_norm=True, leaky=True) :
         """Defines a block of 2 convolutional layers"""
         ### First conv layer in block ###
-        block = [nn.Conv2d(in_channels=in_ch, out_channels=in_ch, kernel_size=3,
+        block = [nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3,
                  stride=1, padding=1)]
         if batch_norm :
-            block += [nn.BatchNorm2d(in_ch)]
+            block += [nn.BatchNorm2d(out_ch)]
         block += [self.relu]
 
         ### Second conv layer in block ###
-        block += [nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3,
+        block += [nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=3,
                  stride=1, padding=1)]
         if batch_norm :
-            block += [nn.BatchNorm2d(in_ch)]
+            block += [nn.BatchNorm2d(out_ch)]
         block += [self.relu]
 
         return block
 
-    def forward(X) :
-        X = self.netowrk(X)
-        print(X.shape)
+    def forward(self, X) :
+        X = self.network(X)
+        X = X.view(-1, 512 * 4 * 4)
+        X = self.fc1(X)
+        X = self.softmax(X)
         return X
 
 
