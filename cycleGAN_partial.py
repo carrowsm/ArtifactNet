@@ -28,14 +28,14 @@ from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
 
-from config.options import get_args
+from config import get_args
 
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
-from models.generators import UNet3D, ResNetK, UNet2D
-from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer, CNN_2D
+from models.generators import UNet3D
+from models.discriminators import PatchGAN_3D, CNN_3D
 from util.helper_functions import set_requires_grad
-from util.loggers import TensorBoardCustom
+from loggers import TensorBoardCustom
 
 
 
@@ -68,19 +68,20 @@ in each class. For these we use the patchGAN discriminator architecture.
 """ MAIN PYTORCH-LIGHTNING MODULE """
 class GAN(pl.LightningModule) :
 
-    def __init__(self, hparams, image_size=[1, 256, 256]):
+    def __init__(self, hparams):
         super(GAN, self).__init__()
         self.hparams = hparams
-        self.image_size = image_size
+
+        self.use_gpu = True
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        self.g_y = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
-        self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
+        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=64)
+        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
-        self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
+        self.d_y = CNN_3D(input_channels=1, out_size=1, n_filters=64)
+        self.d_x = CNN_3D(input_channels=1, out_size=1, n_filters=64)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -109,17 +110,20 @@ class GAN(pl.LightningModule) :
         self.adv_loss = nn.MSELoss(reduction="mean")
         # self.adv_loss = nn.BCELoss()
 
-        # Define loss term coefficients
-        self.lam = 10.0  # Coefficient for cycle consistency loss
-        self.idt = 1.0   # Coefficient for identity loss
-
-
 
 
     def gpu_check(self) :
         if torch.cuda.is_available() :
             n = torch.cuda.device_count()
             print(f"{n} GPUs are available")
+
+            # Put each generator on its own GPU
+            self.g_y.to("cuda:0")
+            self.g_x.to("cuda:1")
+
+            # Put discriminators on its own GPU
+            self.d_y.to("cuda:0")
+            self.d_x.to("cuda:1")
 
             for i in range(n) :
                 device_name = torch.cuda.get_device_name(i)
@@ -132,6 +136,8 @@ class GAN(pl.LightningModule) :
     @pl.data_loader
     def train_dataloader(self):
 
+        self.image_size = [20, 300, 300]
+
         # Test data loader
         dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
                                   self.n_train[ :, 1],           # Paths to DA- images
@@ -139,12 +145,10 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=self.y_train[:, 0], # DA slice index
                                   Y_image_centre=self.n_train[:, 0], # Mouth slice index
                                   image_size=self.image_size,
-                                  transform=None,
-                                  dim="2D"
-                                  )
+                                  transform=None)
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=1, drop_last=True
+                                 shuffle=True, num_workers=10
                                  )
         self.dataset_size = len(dataset)
 
@@ -177,38 +181,61 @@ class GAN(pl.LightningModule) :
 
         ### TRAIN GENERATORS ###
         if optimizer_idx == 0 :
-            ### Calculate G_Y adversarial loss ###
-            # Generate fake DA- images from real DA+ imgs
-            gen_y = self.g_y(x)
+            # Ds require no gradients when optimizing Gs
+            set_requires_grad([self.d_x, self.d_y], False)
 
-            # Run discriminator on generated images
-            d_y_gen_y = self.d_y(gen_y).view(-1)
+            lam = 10.0
 
-            # Compute adversarial loss
-            loss_adv_Y = self.adv_loss(d_y_gen_y, ones.to(d_y_gen_y.device))
+            # Alternate between optimizing G_X and G_Y
+            if batch_nb % 2 == 0 :
+                ### Calculate G_Y loss ###
+                # G_X require no gradients when optimizing G_Y
+                # Due to GPU memory constraints, we will only
+                # backpropogate through one generator for each batch
+                set_requires_grad([self.g_x], False)
+                set_requires_grad([self.g_y], True)
 
+                # Generate fake DA- images from real DA+ imgs
+                gen_y = self.g_y(x.to("cuda:0"))
 
-            ### Calculate G_X adversarial loss ###
-            # Generate fake DA- images from real DA+ imgs
-            gen_x = self.g_x(y)
+                # Run discriminator on generated images
+                d_y_gen_y = self.d_y(gen_y.to("cuda:0")).view(-1)
 
-            # Run discriminator on generated images
-            d_x_gen_x = self.d_x(gen_x).view(-1)
+                # Compute adversarial loss
+                adv_g_loss = self.adv_loss(d_y_gen_y.to("cuda:0"), ones.to("cuda:0"))
 
-            # Compute adversarial loss
-            loss_adv_X = self.adv_loss(d_x_gen_x, ones.to(d_x_gen_x.device))
+                # Generate fake images from fake images (for cyclical loss)
+                gen_x_gen_y = self.g_x(gen_y.to("cuda:1")) # fake DA+ from fake DA-
 
-            ### Compute Cycle Consistency Loss ###
-            # Generate fake images from fake images (for cyclical loss)
-            gen_x_gen_y = self.g_x(gen_y)     # fake DA+ from fake DA-
-            gen_y_gen_x = self.g_y(gen_x)     # fake DA- from fake DA+
+                # Compute cyclic loss and normalize by image size
+                loss_cyc = self.l1_loss(gen_x_gen_y, x.to("cuda:1"))
 
-            # Compute cyclic loss
-            loss_cyc_X = self.l1_loss(gen_x_gen_y, x) * self.lam
-            loss_cyc_Y = self.l1_loss(gen_y_gen_x, y) * self.lam
+                # Generator loss is the sum of these
+                G_loss = adv_g_loss.to("cuda:1") + (lam * loss_cyc)
 
-            # Generator loss is the sum of these
-            G_loss = loss_adv_Y + loss_adv_X + loss_cyc_X + loss_cyc_Y
+            else :
+                ### Calculate G_X loss ###
+                # G_Y require no gradients when optimizing G_X
+                set_requires_grad([self.g_y], False)
+                set_requires_grad([self.g_x], True)
+
+                # Generate fake DA- images from real DA+ imgs
+                gen_x = self.g_x(y.to("cuda:1"))
+
+                # Run discriminator on generated images
+                d_x_gen_x = self.d_x(gen_x.to("cuda:1")).view(-1)
+
+                # Compute adversarial loss
+                adv_g_loss = self.adv_loss(d_x_gen_x.to("cuda:1"), ones.to("cuda:1"))
+
+                # Generate fake images from fake images (for cyclical loss)
+                gen_y_gen_x = self.g_y(gen_x.to("cuda:0")) # fake DA+ from fake DA-
+
+                # Compute cyclic loss
+                loss_cyc = self.l1_loss(gen_y_gen_x, y.to("cuda:0"))
+
+                # Generator loss is the sum of these
+                G_loss = adv_g_loss.to("cuda:0") + (lam * loss_cyc)
 
 
 
@@ -218,40 +245,45 @@ class GAN(pl.LightningModule) :
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
-            self.logger.experiment.add_scalars(f'g_loss', {'g_loss': G_loss,
-                                                           "adv_Y": loss_adv_Y,
-                                                           "adv_X": loss_adv_X,
-                                                           "cyc_Y": loss_cyc_Y,
-                                                           "cyc_X": loss_cyc_X},
-                  batch_nb+(self.dataset_size*self.current_epoch // batch_size))
+            self.logger.experiment.add_scalars(f'g_loss', {"adv_loss": adv_g_loss,
+                                                           "cyc_loss": loss_cyc},
+                             batch_nb+(self.dataset_size*self.current_epoch))
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
+            set_requires_grad([self.d_x, self.d_y], True)
+
             # Generate some images
-            gen_y = self.g_y(x) # fake DA- images from real DA+ imgs
-            gen_x = self.g_x(y) # fake DA+ images from real DA- imgs
+            gen_y = self.g_y(x.to("cuda:0")) # fake DA- images from real DA+ imgs
+            gen_x = self.g_x(y.to("cuda:1")) # fake DA+ images from real DA- imgs
 
             # Forward pass through each discriminator
             # Run discriminator on generated images
             d_y_fake = self.d_y(gen_y.detach()).view(-1)
             d_x_fake = self.d_x(gen_x.detach()).view(-1)
-            d_y_real = self.d_y(y).view(-1)
-            d_x_real = self.d_x(x).view(-1)
+            d_y_real = self.d_y(y.to("cuda:0")).view(-1)
+            d_x_real = self.d_x(x.to("cuda:1")).view(-1)
 
             # Compute loss for each discriminator
             # Put labels on correct GPU
-            ones  =  ones.to(d_y_real.device)
-            zeros = zeros.to(d_y_fake.device)
+            ones  =  ones.to("cuda:0")
+            zeros = zeros.to("cuda:0")
             # ----------------------- #
             loss_Dy = self.adv_loss(d_y_fake, zeros) + self.adv_loss(d_y_real, ones)
 
             # Put labels on correct GPU
-            ones  =  ones.to(d_x_real.device)
-            zeros = zeros.to(d_x_fake.device)
+            ones  =  ones.to("cuda:1")
+            zeros = zeros.to("cuda:1")
             # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
-            D_loss = (loss_Dy + loss_Dx)
+            # Total discriminator loss is the sum of the two
+            # if self.current_epoch == 0 :
+            #     penalty = 10.0 - (1*(self.dataset_size - batch_nb) / self.dataset_size)
+            # else :
+            #     penalty = 1.0
+            penalty = 1.0
+            D_loss = (loss_Dy + loss_Dx.to("cuda:0")) * penalty
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -262,18 +294,18 @@ class GAN(pl.LightningModule) :
 
             # Plot loss every iteration
             self.logger.experiment.add_scalar(f'd_loss', D_loss,
-            batch_nb+(self.dataset_size*self.current_epoch // batch_size))
+                               batch_nb+(self.dataset_size*self.current_epoch))
 
         ### Log some sample images once per epoch ###
-        if batch_nb % 50 == 0 :
+        if batch_nb % 10 == 0 :
             with torch.no_grad() :
                 # Generate some fake images to plot
-                gen_y = self.g_y(x)
-                gen_x = self.g_x(y)
-                images = [    x[0, 0, :, :].cpu(),
-                              y[0, 0, :, :].cpu(),
-                          gen_x[0, 0, :, :].cpu(),
-                          gen_y[0, 0, :, :].cpu()]
+                gen_y = self.g_y(x.to("cuda:0"))
+                gen_x = self.g_x(y.to("cuda:1"))
+                images = [    x[0, 0, 10, :, :].cpu(),
+                              y[0, 0, 10, :, :].cpu(),
+                          gen_x[0, 0, 10, :, :].cpu(),
+                          gen_y[0, 0, 10, :, :].cpu()]
 
             # Plot the image
             self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, batch_nb)
@@ -291,8 +323,8 @@ class GAN(pl.LightningModule) :
         Define two optimizers (D & G), each with its own learning rate scheduler.
         """
         lr = self.hparams.lr
-        G_lr = lr
-        D_lr = lr
+        G_lr = 0.0002
+        D_lr = 0.0002
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
@@ -301,9 +333,9 @@ class GAN(pl.LightningModule) :
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
 
         # Decay generator learning rate by factor of 10 after 1 epoch
-        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[50, 100], gamma=0.5)
+        scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[1, 5], gamma=0.1)
         # Increase discriminator learning rate by factor of 5 every epoch
-        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[50, 100], gamma=0.5)
+        scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[1, 2, 3], gamma=5)
         return [opt_g, opt_d], [scheduler_g, scheduler_d]
 
 
@@ -312,24 +344,20 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[1, 256, 256])
-    # model = GAN(hparams, image_size=[20, 300, 300])
+    model = GAN(hparams)
 
 
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="1_256_256px")
+    logger = TensorBoardCustom(hparams.log_dir, name="20_300_300px")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         # accumulate_grad_batches=4,
-                         # gradient_clip_val=0.9,
-                         max_nb_epochs=hparams.max_num_epochs,
-                         amp_level='O1', precision=16, # Enable 16-bit presicion
-                         gpus=hparams.n_gpus,
-                         # distributed_backend="dp"
+                         accumulate_grad_batches=10,
+                         gradient_clip_val=0.0,
+                         max_nb_epochs=2,
                          )
 
     # ------------------------
