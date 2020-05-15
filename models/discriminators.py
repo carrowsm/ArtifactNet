@@ -106,8 +106,8 @@ class VGG2D(nn.Module):
             net += [self.pool]                      # Pooling layer
 
         self.network = nn.Sequential(*net)
-        self.fc1 = nn.Linear(filters * 4 * 4, out_channels)
-        self.softmax = nn.Softmax()
+        self.fc1 = nn.Linear(filters * 8 * 8, out_channels)
+        # self.softmax = nn.Softmax()
         self.sigmoid = nn.Sigmoid()
 
 
@@ -131,9 +131,9 @@ class VGG2D(nn.Module):
 
     def forward(self, X) :
         X = self.network(X)
-        X = X.view(-1, 512 * 4 * 4)
+        X = X.view(-1, 512 * 8 * 8)
         X = self.fc1(X)
-        X = self.softmax(X)
+        X = self.sigmoid(X)
         return X
 
 

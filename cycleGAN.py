@@ -92,7 +92,7 @@ class GAN(pl.LightningModule) :
         # Create train and test sets for each DA+ and DA- imgs
         files = load_img_names(hparams.img_dir,
                                y_da_df=y_df, n_da_df=n_df,
-                               f_type="npy", suffix="_img",
+                               f_type="nrrd", suffix="_image",
                                data_augmentation_factor=hparams.augmentation_factor,
                                test_size=0.25)
         self.y_train, self.n_train, self.y_test, self.n_test = files
@@ -134,7 +134,7 @@ class GAN(pl.LightningModule) :
         # Test data loader
         dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
                                   self.n_train[ :, 1],           # Paths to DA- images
-                                  file_type="npy",
+                                  file_type="nrrd",
                                   X_image_centre=self.y_train[:, 0], # DA slice index
                                   Y_image_centre=self.n_train[:, 0], # Mouth slice index
                                   image_size=self.image_size,
@@ -324,11 +324,11 @@ def main(hparams):
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
                          # accumulate_grad_batches=4,
-                         # gradient_clip_val=0.9,
+                         gradient_clip_val=0.1,
                          max_nb_epochs=hparams.max_num_epochs,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
-                         # distributed_backend="dp"
+                         distributed_backend="dp"
                          )
 
     # ------------------------

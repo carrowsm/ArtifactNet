@@ -20,17 +20,18 @@ conda activate DAnet
 cd ../
 
 # Python script we are running
-path=/cluster/home/carrowsm/ArtifactNet/cycleGAN_16bit.py
+path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
 
 # Paths to data and logs
 csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
-img_path="/cluster/projects/radiomics/Temp/RADCURE-npy/img"
+# img_path="/cluster/projects/radiomics/Temp/RADCURE-npy/img"
+img_path="/cluster/projects/radiomics/Temp/colin/isotropic_npy/images"
 log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=16                            # Batch size for trainer
+batch_size=4                             # Batch size for trainer
 aug_factor=1                             # Number of times to augment each image
 num_gpus=4                               # Number of GPUs to use for training
 
