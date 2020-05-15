@@ -18,10 +18,10 @@ def load_image_data_frame(path) :
     """ Load data Frame containing the DA label and location of each patient"""
     df = pd.read_csv(path,
                      # index_col="patient_id",
-                     usecols=["patient_id", "has_artifact", "a_slice"],
+                     usecols=["patient_id", "has_artifact", "DA_z"],
                      dtype=str, na_values=['nan', 'NaN', ''])
     df.set_index("patient_id", inplace=True)
-    df["DA_z"] = df["a_slice"].astype(int)
+    df["DA_z"] = df["DA_z"].astype(int)
 
     da_plus  = df[df["has_artifact"] == "2"]
     da_minus = df[df["has_artifact"] == "0"]
