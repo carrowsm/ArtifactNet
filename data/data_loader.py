@@ -23,7 +23,7 @@ def load_image_data_frame(path) :
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
-    da_plus  = df[df["has_artifact"] == "2"]
+    da_plus  = df[df["has_artifact"] == "1"]
     da_minus = df[df["has_artifact"] == "0"]
 
     return da_plus["DA_z"], da_minus["DA_z"]
@@ -55,15 +55,14 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", suffix="", dat
     Returns:
         Two lists: A list of paths for all the training images and another for test.
     """
-    if len(suffix) > 0  :
-        suffix = suffix + "." + f_type
+
+    suffix = suffix + "." + f_type
 
     if y_da_df is None or y_da_df is None:
         file_list = []
         # Get list of all the patients in the directory
         for file in os.listdir(dir) :
-            extension = file.split(".")[-1]
-            if extension == f_type :
+            if file.endswith(f_type) :
                 # This file can be used; add this file to the file_list
                 file_list.append(file)
 
@@ -85,8 +84,8 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", suffix="", dat
         y_da_df["paths"] = dir + "/" + y_da_df.index.values + suffix   # Paths to DA+ images
         n_da_df["paths"] = dir + "/" + n_da_df.index.values + suffix   # Paths to DA- images
 
-        y = y_da_df.loc[:, "DA_z" : "paths"].values           # np array with one col
-        n = n_da_df.loc[:, "DA_z" : "paths"].values           # for paths, one for z-index
+        y = y_da_df.loc[:, "DA_z" : "paths"].values                    # np array with one col
+        n = n_da_df.loc[:, "DA_z" : "paths"].values                    # for paths, one for z-index
 
         y_train, y_test = train_test_split(y, test_size=test_size) # y_train, test
         n_train, n_test = train_test_split(n, test_size=test_size) # has 2 cols, first
@@ -179,7 +178,7 @@ class UnpairedDataset(t_data.Dataset):
         # Total number of images (max from either class)
         self.x_size = len(X_image_names)
         self.y_size = len(Y_image_names)
-        self.dataset_length = np.max([self.x_size, self.y_size])
+        self.dataset_length = self.x_size
 
         # Get the correct function to load the image type
         self.load_img = self.get_img_loader()
@@ -207,15 +206,21 @@ class UnpairedDataset(t_data.Dataset):
     def get_cropper(self) :
         """ Identify which cropping function should be used """
         if self.image_size is None :                         # No cropping
-            self.x_img_centre = np.zeros((self.dataset_length, 3))  # A dummy array that the cropping fn accepts
-            self.y_img_centre = np.zeros((self.dataset_length, 3))
+            self.x_img_centre = np.zeros((self.x_size, 3))  # A dummy array that the cropping fn accepts
+            self.y_img_centre = np.zeros((self.y_size, 3))
             return lambda X, size, p : X                # return original image
+
+
         else :
             if type(self.image_size) == int :
                 i = self.image_size                     # Make image size into a list
                 self.image_size = [i, i, i]             # of size in each axis
 
-            if self.x_img_centre is None :              # No centre pixel given,
+            if self.x_img_centre is None or self.y_img_centre is None :
+                print("no image centres given")
+                # No img centre given. Use centre cropping. Create dummy array for function to accept
+                self.x_img_centre = np.zeros((self.x_size, 3))
+                self.y_img_centre = np.zeros((self.y_size, 3))
                 return self.centre_crop                 # crop around image centre
             else :
                 # self.image_centre = np.array(self.image_centre)
@@ -262,11 +267,12 @@ class UnpairedDataset(t_data.Dataset):
         """When we start using data augmentation we will call transform to
         apply random rotations, translations etc to the data"""
         min_val = -1000.0
-        max_val =  1500.0
-        X = np.clip(X, min_val, max_val) - min_val  # Make min 0
+        max_val =  1000.0
+        X = np.clip(X, min_val, max_val)            # Make range (-1000, 1000)
         X = torch.tensor(X, dtype=torch.float32)
         # X = self.transforms(X)                    # Apply augmentations
-        X = X / (max_val - min_val)                 # Make range (0, 1)
+        # X = X / (max_val - min_val)               # Make range (0, 1)
+        X = X / 1000.0                              # Make range (-1, 1)
         return X
 
 
@@ -301,8 +307,8 @@ class UnpairedDataset(t_data.Dataset):
         # Reshape the arrays to add another dimension
         try :
             if self.dim == "2D" :
-                X_tensor = X_tensor.reshape(1, self.image_size[1], self.image_size[2])
-                Y_tensor = Y_tensor.reshape(1, self.image_size[1], self.image_size[2])
+                X_tensor = X_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+                Y_tensor = Y_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
             else :
                 X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
                 Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
@@ -310,6 +316,7 @@ class UnpairedDataset(t_data.Dataset):
             print("image not found")
             i = np.random.randint(0, self.x_size - 1)
             return self[i]
+
 
 
         return X_tensor, Y_tensor
