@@ -33,28 +33,29 @@ class CNN_2D(nn.Module):
         self.pool = nn.MaxPool2d(2, 2) # (kernel_size, stride)
         self.LRelu = nn.LeakyReLU(0.2)
 
-        self.conv1 = nn.Conv2d(in_channels, 4, 5, padding=2)
-        self.conv1_bn = nn.BatchNorm2d(4)
+        self.filters = 64
+        self.conv1 = nn.Conv2d(in_channels, self.filters, 5, padding=2)
+        self.conv1_bn = nn.BatchNorm2d(self.filters)
 
-        self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
-        self.conv2_bn = nn.BatchNorm2d(8)
+        self.conv2 = nn.Conv2d(self.filters, self.filters*2, 3, padding=1)
+        self.conv2_bn = nn.BatchNorm2d(self.filters*2)
 
-        self.conv3 = nn.Conv2d(8, 16, 3, padding=1)
-        self.conv3_bn = nn.BatchNorm2d(16)
+        self.conv3 = nn.Conv2d(self.filters*2, self.filters*4, 3, padding=1)
+        self.conv3_bn = nn.BatchNorm2d( self.filters*4)
 
-        self.conv4 = nn.Conv2d(16, 32, 3, padding=1)
-        self.conv4_bn = nn.BatchNorm2d(32)
+        self.conv4 = nn.Conv2d(self.filters*4, self.filters*8, 3, padding=1)
+        self.conv4_bn = nn.BatchNorm2d(self.filters*8)
 
-        self.conv5 = nn.Conv2d(32, 64, 3, padding=1)
-        self.conv5_bn = nn.BatchNorm2d(64)
+        self.conv5 = nn.Conv2d(self.filters*8, self.filters*16, 3, padding=1)
+        self.conv5_bn = nn.BatchNorm2d(self.filters*16)
 
         self.avgPool = nn.AvgPool2d(2, 2)
 
-        self.fc3 = nn.Linear(64 * 8 * 8, out_channels)
+        self.fc3 = nn.Linear(self.filters*16 * 8 * 8, out_channels)
 
-        self.softmax = torch.nn.Softmax(dim=1)
-
-        self.sigmoid = torch.nn.Sigmoid()
+        # self.softmax = torch.nn.Softmax(dim=1)
+        #
+        # self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, X):
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X))))
@@ -65,13 +66,16 @@ class CNN_2D(nn.Module):
         X = self.avgPool(X)
 
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
-        X = X.view(-1, 64 * 8 * 8)
+        X = X.view(-1, self.filters*16 * 8 * 8)
         X = self.fc3(X)
 
         # Constrain output of model to (0, 1)
-        X = self.sigmoid(X)
+        # X = self.sigmoid(X)
 
         return X
+
+
+
 
 class VGG2D(nn.Module):
     """Implementation of 2D VGG-16 with variable depth."""

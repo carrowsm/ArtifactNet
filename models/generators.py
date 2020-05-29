@@ -20,6 +20,7 @@ class UNet2D(nn.Module):
             https://arxiv.org/abs/1505.04597
             GitHub: https://github.com/milesial/Pytorch-UNet
         """
+        self.sigmoid = nn.Sigmoid()
 
         self.features = init_features
         self.encoder1 = self.conv_relu(in_channels, features, name="enc1")
@@ -74,8 +75,11 @@ class UNet2D(nn.Module):
         x = self.upconv1(x)                                # (N,   64, 256, 256)
         x = torch.cat((x, enc1), dim=1)                    # (N,  128, 256, 256)
         x = self.decoder1(x)                               # (N,   64, 256, 256)
-        # return torch.sigmoid(self.conv(dec1))            # (N,    1, 256, 256)
-        return self.conv(x)
+        x = self.conv(x)                                   # (N,    1, 256, 256)
+
+        # x = self.sigmoid(x)
+        
+        return x
 
 
     @staticmethod
