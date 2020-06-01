@@ -112,7 +112,7 @@ class VGG2D(nn.Module):
         self.network = nn.Sequential(*net)
         self.fc1 = nn.Linear(filters * 8 * 8, out_channels)
         # self.softmax = nn.Softmax()
-        self.sigmoid = nn.Sigmoid()
+        # self.sigmoid = nn.Sigmoid()
 
 
     def conv_block(self, in_ch, out_ch, batch_norm=True, leaky=True) :

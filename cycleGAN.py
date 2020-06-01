@@ -249,7 +249,8 @@ class GAN(pl.LightningModule) :
                                                            "adv_X": loss_adv_X,
                                                            "cyc_Y": loss_cyc_Y,
                                                            "cyc_X": loss_cyc_X},
-                  batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
+                                                           self.global_step)
+                  # batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
@@ -287,8 +288,8 @@ class GAN(pl.LightningModule) :
                                   })
 
             # Plot loss every iteration
-            self.logger.experiment.add_scalar(f'd_loss', D_loss,
-            batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
+            self.logger.experiment.add_scalar(f'd_loss', D_loss, self.global_step)
+            # batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
 
 
 
@@ -313,7 +314,6 @@ class GAN(pl.LightningModule) :
 
         ### DISCRIMINATOR LOSS ###
         # Forward pass through each discriminator
-        # Run discriminator on generated images
         d_y_fake = self.d_y(gen_y).view(-1)
         d_x_fake = self.d_x(gen_x).view(-1)
         d_y_real = self.d_y(y).view(-1)
@@ -322,7 +322,6 @@ class GAN(pl.LightningModule) :
         # Compute loss for each discriminator
         loss_Dy = self.adv_loss(d_y_fake, zeros.to(d_y_fake.device)) + \
                   self.adv_loss(d_y_real, ones.to(d_y_real.device))
-        # ----------------------- #
         loss_Dx = self.adv_loss(d_x_fake, zeros.to(d_x_fake.device)) + \
                   self.adv_loss(d_x_real, ones.to(d_x_real.device))
         D_loss = (loss_Dy + loss_Dx)
@@ -345,6 +344,10 @@ class GAN(pl.LightningModule) :
         ### -- ------------- -- ###
 
 
+        # Save the losses in a dictionary
+        output = OrderedDict({'d_loss_val': D_loss,
+                              'g_loss_val': G_loss,
+                              })
 
         ### Log some sample images once per epoch ###
         if batch_idx == 0 :
@@ -358,22 +361,31 @@ class GAN(pl.LightningModule) :
             # Plot the image
             self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, batch_idx)
 
-        # Save the discriminator loss in a dictionary
-        tqdm_dict = {'d_loss_val': D_loss,
-                     'g_loss_val': G_loss}
-        output = OrderedDict({'d_loss_val': D_loss,
-                              'g_loss_val': G_loss,
-                              'progress_bar': tqdm_dict,
-                              'log': tqdm_dict
-                              })
-
-        # Plot loss every iteration
-        b = self.current_epoch
-        self.logger.experiment.add_scalar(f'd_loss_val', D_loss, b)
-        self.logger.experiment.add_scalar(f'g_loss_val', G_loss, b)
-
         return output
 
+
+    def validation_epoch_end(self, outputs):
+        g_loss_mean, d_loss_mean = 0, 0
+        val_size = len(outputs)
+
+        for output in outputs: # Average over all val batches
+            d_loss_mean += output['d_loss_val'] / val_size
+            g_loss_mean += output['g_loss_val'] / val_size
+
+        # Plot loss from this epoch
+        b = self.current_epoch
+        self.print(b)
+        self.logger.experiment.add_scalar(f'd_loss_val', d_loss_mean, b)
+        self.logger.experiment.add_scalar(f'g_loss_val', g_loss_mean, b)
+
+        tqdm_dict = {'d_loss_val': d_loss_mean.item(),
+                     'g_loss_val': g_loss_mean.item()}
+
+        # show val_acc in progress bar but only log val_loss
+        results = {'progress_bar': tqdm_dict,
+                   'log': tqdm_dict}
+
+        return results
 
 
     def configure_optimizers(self):
@@ -397,13 +409,16 @@ class GAN(pl.LightningModule) :
         # scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[2, 3, 4, 5, 6], gamma=0.5)
         # scheduler_d = torch.optim.lr_scheduler.ReduceLROnPlateau(opt_d, 'min')
 
-        scheduler_g = {'scheduler': ReduceLROnPlateau(opt_g, 'min'),
-                       'monitor': 'loss', # Default: val_loss
+        scheduler_g = {# This scheduler will reduce lr if it plateaus for 2 epochs
+                       'scheduler': ReduceLROnPlateau(opt_g, 'min', patience=2,
+                                                      verbose=True, factor=0.5),
+                       'monitor': 'g_loss_val', # Default: val_loss
                        'interval': 'epoch',
                        'frequency': 1
                        }
-        scheduler_d = {'scheduler': ReduceLROnPlateau(opt_d, 'min'),
-                       'monitor': 'loss', # Default: val_loss
+        scheduler_d = {'scheduler': ReduceLROnPlateau(opt_d, 'min', patience=2,
+                                                      verbose=True, factor=0.5),
+                       'monitor': 'd_loss_val', # Default: val_loss
                        'interval': 'epoch',
                        'frequency': 1
                        }
@@ -429,7 +444,7 @@ def main(hparams):
                          # accumulate_grad_batches=4,
                          # gradient_clip_val=0.9,
                          # max_nb_epochs=hparams.max_num_epochs,
-                         val_percent_check=0.2,
+                         val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
                          distributed_backend="ddp"
