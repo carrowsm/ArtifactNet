@@ -6,8 +6,6 @@ To begin training this model on H4H, run
 $ sbatch train_cycleGAN.sh
 """
 
-
-
 import os
 import itertools
 from argparse import ArgumentParser
@@ -66,20 +64,44 @@ in each class. For these we use the patchGAN discriminator architecture.
 
 """ MAIN PYTORCH-LIGHTNING MODULE """
 class GAN(pl.LightningModule) :
+    """
+    Parameters :
+    ------------
+        hparams (dict) :
+            Should include all hyperparameters as well as paths to data and CSV
+            of labels.
+        image_size (list, length of 3) :
+            A list representing the 3D shape of the images to be to used, indexed
+            as (z_size, y_size, x_size). To use a single CT slice, pass
+            image_size=(1, y_size, x_size).
+        dimension (int) :
+            Whether to use a 3D or 2D network. If 2, the images will have shape
+            (batch_size, z_size, y_size, x_size) and the z-axis will be used as
+            the input-channels of a 2D network. If 3, the images will have shape
+            (batch_size, 1, z_size, y_size, x_size) and a fully 3D convolutional
+            network will be used.
+    """
 
-    def __init__(self, hparams, image_size=[1, 256, 256]):
+    def __init__(self, hparams, image_size=[1, 256, 256], dimension=3):
         super(GAN, self).__init__()
         self.hparams = hparams
         self.image_size = image_size
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        self.g_y = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
-        self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
+        # self.g_y = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
+        # self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
+        #
+        # # One discriminator to identify real DA+ images, another for DA- images
+        # self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
+        # self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
+
+        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=64)
+        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
-        self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
+        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=64)
+        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=64)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -166,7 +188,7 @@ class GAN(pl.LightningModule) :
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
                                   transform=None,
-                                  dim="2D"
+                                  dim="3D"
                                   )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
                                  shuffle=False, num_workers=10, drop_last=True
@@ -250,7 +272,6 @@ class GAN(pl.LightningModule) :
                                                            "cyc_Y": loss_cyc_Y,
                                                            "cyc_X": loss_cyc_X},
                                                            self.global_step)
-                  # batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
@@ -289,7 +310,6 @@ class GAN(pl.LightningModule) :
 
             # Plot loss every iteration
             self.logger.experiment.add_scalar(f'd_loss', D_loss, self.global_step)
-            # batch_nb+(self.dataset_size*self.current_epoch // (batch_size*self.n_gpus)))
 
 
 
@@ -351,15 +371,20 @@ class GAN(pl.LightningModule) :
 
         ### Log some sample images once per epoch ###
         if batch_idx == 0 :
-            with torch.no_grad() :
-                # Generate some fake images to plot
+            # Generate some fake images to plot
+            if dimension == 2
                 images = [    x[0, self.image_size[0] // 2, :, :].cpu(),
                               y[0, self.image_size[0] // 2, :, :].cpu(),
                           gen_x[0, self.image_size[0] // 2, :, :].cpu(),
                           gen_y[0, self.image_size[0] // 2, :, :].cpu()]
+            else :
+                images = [    x[0, 0, self.image_size[0] // 2, :, :].cpu(),
+                              y[0, 0, self.image_size[0] // 2, :, :].cpu(),
+                          gen_x[0, 0, self.image_size[0] // 2, :, :].cpu(),
+                          gen_y[0, 0, self.image_size[0] // 2, :, :].cpu()]
 
-            # Plot the image
-            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, batch_idx)
+        # Plot the image
+        self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, self.global_step)
 
         return output
 
@@ -373,10 +398,8 @@ class GAN(pl.LightningModule) :
             g_loss_mean += output['g_loss_val'] / val_size
 
         # Plot loss from this epoch
-        b = self.current_epoch
-        self.print(b)
-        self.logger.experiment.add_scalar(f'd_loss_val', d_loss_mean, b)
-        self.logger.experiment.add_scalar(f'g_loss_val', g_loss_mean, b)
+        self.logger.experiment.add_scalar(f'val/d_loss', d_loss_mean, self.global_step)
+        self.logger.experiment.add_scalar(f'val/g_loss', g_loss_mean, self.global_step)
 
         tqdm_dict = {'d_loss_val': d_loss_mean.item(),
                      'g_loss_val': g_loss_mean.item()}
@@ -402,12 +425,9 @@ class GAN(pl.LightningModule) :
         opt_d = torch.optim.Adam(itertools.chain(self.d_x.parameters(),
                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
 
-        # Decay generator learning rate by factor of 10 after 1 epoch
-        # scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[2, 3, 4, 5, 6], gamma=0.5)
-        # scheduler_g = torch.optim.lr_scheduler.ReduceLROnPlateau(opt_g, 'min')
-        # Increase discriminator learning rate by factor of 5 every epoch
-        # scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[2, 3, 4, 5, 6], gamma=0.5)
-        # scheduler_d = torch.optim.lr_scheduler.ReduceLROnPlateau(opt_d, 'min')
+        # Decay generator learning rate by factor every milestone[i] epochs
+        # scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[10, 11, 12, 13, 14, 15], gamma=0.5)
+        # scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[10, 11, 12, 13, 14, 15], gamma=0.5)
 
         scheduler_g = {# This scheduler will reduce lr if it plateaus for 2 epochs
                        'scheduler': ReduceLROnPlateau(opt_g, 'min', patience=2,
@@ -430,14 +450,14 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[16, 256, 256])
+    model = GAN(hparams, image_size=[32, 256, 256], dimension=3)
 
 
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px_2D")
+    logger = TensorBoardCustom(hparams.log_dir, name="32_256_256px")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,

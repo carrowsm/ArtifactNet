@@ -110,8 +110,8 @@ class UnpairedDataset(t_data.Dataset):
     """
     Image dataset for ArtifactNet artifact removal GAN.
 
-    Attributes:
-
+    Parameters:
+    -----------
         X_image_names : array, shape(N, 1)
             A column vector were each row is the full path to the image file of
             a patient from domain X.
@@ -145,9 +145,17 @@ class UnpairedDataset(t_data.Dataset):
             - Accepted names are ["rotatate", "flip" ].
         file_type: str, (default: "nrrd")
             - The file type to load. Can be either "npy" or "nrrd" or "dicom".
+        dim : int
+            The dimension of the output image. If 2, images will have shape
+            If 2, the images will have shape(batch_size, z_size, y_size, x_size).
+            If 3, the images will have shape
+            (batch_size, 1, z_size, y_size, x_size).
 
+    Attributes :
+    ------------
 
     Methods :
+    ---------
 
 
     """
@@ -160,7 +168,7 @@ class UnpairedDataset(t_data.Dataset):
                  file_type="nrrd",
                  image_size=None,
                  transform=None,
-                 dim="3D"):
+                 dim=3):
 
         self.dim          = dim
         # self.root_dir     = image_root_dir
@@ -306,7 +314,7 @@ class UnpairedDataset(t_data.Dataset):
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # Reshape the arrays to add another dimension
         try :
-            if self.dim == "2D" :
+            if self.dim == 2 :
                 X_tensor = X_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
                 Y_tensor = Y_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
             else :
@@ -328,7 +336,7 @@ class UnpairedDataset(t_data.Dataset):
 
 
 
-class PairedDataset(object):
+class PairedDataset(t_data.Dataset):
     """
     Image dataset for ArtifactNet artifact removal GAN.
 

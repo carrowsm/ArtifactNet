@@ -22,7 +22,7 @@ def conv_out_shape(in_shape, kernel_size=[4,4,4], stride=1, padding=0, dilation=
 
 
 class CNN_2D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=1):
+    def __init__(self, in_channels=1, out_channels=1, init_features=64):
         super(CNN_2D, self).__init__()
 
         """ Use architecture from Mattea's DA detection paper """
@@ -33,7 +33,7 @@ class CNN_2D(nn.Module):
         self.pool = nn.MaxPool2d(2, 2) # (kernel_size, stride)
         self.LRelu = nn.LeakyReLU(0.2)
 
-        self.filters = 64
+        self.filters = init_features
         self.conv1 = nn.Conv2d(in_channels, self.filters, 5, padding=2)
         self.conv1_bn = nn.BatchNorm2d(self.filters)
 
@@ -75,6 +75,53 @@ class CNN_2D(nn.Module):
         return X
 
 
+
+
+class CNN_3D(nn.Module):
+    def __init__(self, in_channels=1, out_channels=1, init_features=64):
+        super(CNN_3D, self).__init__()
+
+        """ Use architecture from Mattea's DA detection paper """
+        # PyTorch's conv2d takes the following form:
+        # initialization:   (channels_in, channels_out, kernel_size)
+        # Input :           (batch_size, Channels_in, H, W)
+
+        self.pool = nn.MaxPool3d(2, 2) # (kernel_size, stride)
+        self.LRelu = nn.LeakyReLU(0.2)
+
+        self.filters = init_features
+        self.conv1 = nn.Conv3d(in_channels, self.filters, 5, padding=2)
+        self.conv1_bn = nn.BatchNorm3d(self.filters)
+
+        self.conv2 = nn.Conv3d(self.filters, self.filters*2, 3, padding=1)
+        self.conv2_bn = nn.BatchNorm3d(self.filters*2)
+
+        self.conv3 = nn.Conv3d(self.filters*2, self.filters*4, 3, padding=1)
+        self.conv3_bn = nn.BatchNorm3d( self.filters*4)
+
+        self.conv4 = nn.Conv3d(self.filters*4, self.filters*8, 3, padding=1)
+        self.conv4_bn = nn.BatchNorm3d(self.filters*8)
+
+        self.conv5 = nn.Conv3d(self.filters*8, self.filters*16, 3, padding=1)
+        self.conv5_bn = nn.BatchNorm3d(self.filters*16)
+
+        self.avgPool = nn.AvgPool3d(2, 2)
+
+        self.fc3 = nn.Linear(self.filters*16 * 8 * 8, out_channels)
+
+    def forward(self, X):                             # X.shape = (N,    1, 16, 256, 256)
+        X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X)))) # (N,   64,  8, 128, 128)
+        X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X)))) # (N,  128,  4,  64,  64)
+        X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X)))) # (N,  256,  2,  32,  32)
+        X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X)))) # (N,  512,  1,  16,  16)
+        X = self.conv5_bn(self.LRelu(self.conv5(X)))            # (N, 1024,  1,  16,  16)
+        X = self.avgPool(X)
+
+        # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
+        X = X.view(-1, self.filters*16 * 8 * 8)
+        X = self.fc3(X)
+
+        return X
 
 
 class VGG2D(nn.Module):
@@ -140,53 +187,6 @@ class VGG2D(nn.Module):
         X = self.sigmoid(X)
         return X
 
-
-
-
-class CNN_3D(nn.Module) :
-    """A 3D PatchGAN """
-    def __init__(self, input_channels=1, out_size=1, n_filters=64):
-        """
-        Parameters:
-            input_channels (int) : Number of input channels (default=1).
-            out_size (int) :       The shape of the output tensor. The output
-                                   will be cubic with shape
-                                   (out_size, out_size, out_size). Default=1.
-            n_filters :            The number of filters to use in the last
-                                   concolutional layer (default=64).
-        """
-        super(CNN_3D, self).__init__()
-
-        # Parameters for convolutional layers
-        ks = 4     # Kernel size
-        pads = 1   # Padding size
-        s = 2      # Convolution stride
-
-        self.conv1 = nn.Conv3d(in_channels=input_channels, out_channels=n_filters,
-                               kernel_size=ks, stride=s, padding=pads)
-        self.Lrelu = nn.LeakyReLU(0.2, inplace=False)
-
-        self.conv2 = nn.Conv3d(in_channels=n_filters, out_channels=n_filters * 2,
-                               kernel_size=ks, stride=s, padding=pads, bias=True)
-
-        self.bnorm = nn.BatchNorm3d(n_filters * 2)
-
-        self.conv3 = nn.Conv3d(in_channels=n_filters * 2, out_channels=1,
-                               kernel_size=ks, stride=s, padding=pads, bias=True)
-
-        self.fc = torch.nn.Linear(in_features=1*2*37*37, out_features=1, bias=True)
-
-
-    def forward(self, X) :
-        # Assume batch_size = N and X.shape = (N,   1, 20, 300, 300)
-        X = self.conv1(X)                   # (N,  64, 10, 150, 150)
-        X = self.Lrelu(X)                   # (N,  64, 10, 150, 150)
-        X = self.conv2(X)                   # (N, 128,  5,  75,  75)
-        X = self.bnorm(X)                   # (N, 128,  5,  75,  75)
-        X = self.Lrelu(X)                   # (N, 128,  5,  75,  75)
-        X = self.conv3(X)                   # (N,   1,  2,  37,  37)
-        X = self.fc(X.view(-1, 1*2*37*37))  # (N,   1,  1,   1,   1)
-        return X
 
 
 class PatchGAN_3D(nn.Module) :
