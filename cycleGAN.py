@@ -86,6 +86,7 @@ class GAN(pl.LightningModule) :
         super(GAN, self).__init__()
         self.hparams = hparams
         self.image_size = image_size
+        self.dimension = dimension
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
@@ -96,12 +97,12 @@ class GAN(pl.LightningModule) :
         # self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
         # self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
 
-        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=64)
-        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=64)
+        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=32)
+        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=32)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=64)
-        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=64)
+        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=32)
+        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=32)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -164,11 +165,12 @@ class GAN(pl.LightningModule) :
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
                                   transform=None,
-                                  dim="2D"
+                                  dim=self.dimension
                                   )
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=10, drop_last=True
+                                 shuffle=True, num_workers=5, drop_last=True,
+                                 pin_memory=True
                                  )
         self.dataset_size = len(dataset)
 
@@ -188,10 +190,11 @@ class GAN(pl.LightningModule) :
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
                                   transform=None,
-                                  dim="3D"
+                                  dim=self.dimension
                                   )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=False, num_workers=10, drop_last=True
+                                 shuffle=False, num_workers=10, drop_last=True,
+                                 pin_memory=True
                                  )
         return data_loader
 
@@ -216,8 +219,8 @@ class GAN(pl.LightningModule) :
         batch_size = x.size(0)
 
         # Create ground truth results
-        zeros = torch.zeros(batch_size)
-        ones = torch.ones(batch_size)
+        zeros = torch.zeros(batch_size, device=x.device)
+        ones  = torch.ones(batch_size, device=x.device)
 
         ### TRAIN GENERATORS ###
         if optimizer_idx == 0 :
@@ -229,7 +232,7 @@ class GAN(pl.LightningModule) :
             d_y_gen_y = self.d_y(gen_y).view(-1)
 
             # Compute adversarial loss
-            loss_adv_Y = self.adv_loss(d_y_gen_y, ones.to(d_y_gen_y.device))
+            loss_adv_Y = self.adv_loss(d_y_gen_y, ones)
 
 
             ### Calculate G_X adversarial loss ###
@@ -240,7 +243,7 @@ class GAN(pl.LightningModule) :
             d_x_gen_x = self.d_x(gen_x).view(-1)
 
             # Compute adversarial loss
-            loss_adv_X = self.adv_loss(d_x_gen_x, ones.to(d_x_gen_x.device))
+            loss_adv_X = self.adv_loss(d_x_gen_x, ones)
 
             ### Compute Cycle Consistency Loss ###
             # Generate fake images from fake images (for cyclical loss)
@@ -287,15 +290,8 @@ class GAN(pl.LightningModule) :
             d_x_real = self.d_x(x).view(-1)
 
             # Compute loss for each discriminator
-            # Put labels on correct GPU
-            ones  =  ones.to(d_y_real.device)
-            zeros = zeros.to(d_y_fake.device)
             # ----------------------- #
             loss_Dy = self.adv_loss(d_y_fake, zeros) + self.adv_loss(d_y_real, ones)
-
-            # Put labels on correct GPU
-            ones  =  ones.to(d_x_real.device)
-            zeros = zeros.to(d_x_fake.device)
             # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
@@ -324,8 +320,8 @@ class GAN(pl.LightningModule) :
         batch_size = x.size(0)
 
         # Create ground truth results
-        zeros = torch.zeros(batch_size)
-        ones = torch.ones(batch_size)
+        zeros = torch.zeros(batch_size, device=x.device)
+        ones = torch.ones(batch_size, device=x.device)
 
         gen_y = self.g_y(x)             # Generate DA- images from original DA+
         gen_x = self.g_x(y)             # Generate DA+ images from original DA-
@@ -340,17 +336,15 @@ class GAN(pl.LightningModule) :
         d_x_real = self.d_x(x).view(-1)
 
         # Compute loss for each discriminator
-        loss_Dy = self.adv_loss(d_y_fake, zeros.to(d_y_fake.device)) + \
-                  self.adv_loss(d_y_real, ones.to(d_y_real.device))
-        loss_Dx = self.adv_loss(d_x_fake, zeros.to(d_x_fake.device)) + \
-                  self.adv_loss(d_x_real, ones.to(d_x_real.device))
+        loss_Dy = self.adv_loss(d_y_fake, zeros) + self.adv_loss(d_y_real, ones)
+        loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
         D_loss = (loss_Dy + loss_Dx)
         ### ------------------ ###
 
         ### -- GENERATOR LOSS -- ###
         # Compute adversarial loss
-        loss_adv_X = self.adv_loss(d_x_fake, ones.to(d_x_fake.device))
-        loss_adv_Y = self.adv_loss(d_y_fake, ones.to(d_y_fake.device))
+        loss_adv_X = self.adv_loss(d_x_fake, ones)
+        loss_adv_Y = self.adv_loss(d_y_fake, ones)
 
         # Compute Cycle Consistency Loss
         loss_cyc_X = self.l1_loss(gen_x_gen_y, x) * self.lam
@@ -372,7 +366,7 @@ class GAN(pl.LightningModule) :
         ### Log some sample images once per epoch ###
         if batch_idx == 0 :
             # Generate some fake images to plot
-            if dimension == 2
+            if self.dimension == 2 :
                 images = [    x[0, self.image_size[0] // 2, :, :].cpu(),
                               y[0, self.image_size[0] // 2, :, :].cpu(),
                           gen_x[0, self.image_size[0] // 2, :, :].cpu(),
@@ -383,8 +377,8 @@ class GAN(pl.LightningModule) :
                           gen_x[0, 0, self.image_size[0] // 2, :, :].cpu(),
                           gen_y[0, 0, self.image_size[0] // 2, :, :].cpu()]
 
-        # Plot the image
-        self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, self.global_step)
+            # Plot the image
+            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, self.global_step)
 
         return output
 
@@ -401,8 +395,8 @@ class GAN(pl.LightningModule) :
         self.logger.experiment.add_scalar(f'val/d_loss', d_loss_mean, self.global_step)
         self.logger.experiment.add_scalar(f'val/g_loss', g_loss_mean, self.global_step)
 
-        tqdm_dict = {'d_loss_val': d_loss_mean.item(),
-                     'g_loss_val': g_loss_mean.item()}
+        tqdm_dict = {'d_loss_val': d_loss_mean.detach(),
+                     'g_loss_val': g_loss_mean.detach()}
 
         # show val_acc in progress bar but only log val_loss
         results = {'progress_bar': tqdm_dict,
@@ -450,24 +444,27 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[32, 256, 256], dimension=3)
+    model = GAN(hparams, image_size=[16, 256, 256], dimension=3)
 
 
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="32_256_256px")
+    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         # accumulate_grad_batches=4,
+                         accumulate_grad_batches=10,
                          # gradient_clip_val=0.9,
                          # max_nb_epochs=hparams.max_num_epochs,
                          val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
-                         distributed_backend="ddp"
+                         num_nodes=1,
+                         distributed_backend="ddp",
+                         benchmark=True,
+                         profiler=True
                          )
 
     # ------------------------

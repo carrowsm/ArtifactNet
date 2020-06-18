@@ -99,26 +99,27 @@ class CNN_3D(nn.Module):
         self.conv3 = nn.Conv3d(self.filters*2, self.filters*4, 3, padding=1)
         self.conv3_bn = nn.BatchNorm3d( self.filters*4)
 
-        self.conv4 = nn.Conv3d(self.filters*4, self.filters*8, 3, padding=1)
-        self.conv4_bn = nn.BatchNorm3d(self.filters*8)
+        # self.conv4 = nn.Conv3d(self.filters*4, self.filters*8, 3, padding=1)
+        # self.conv4_bn = nn.BatchNorm3d(self.filters*8)
 
-        self.conv5 = nn.Conv3d(self.filters*8, self.filters*16, 3, padding=1)
-        self.conv5_bn = nn.BatchNorm3d(self.filters*16)
+        self.conv5 = nn.Conv3d(self.filters*4, self.filters*8, 3, padding=1)
+        self.conv5_bn = nn.BatchNorm3d(self.filters*8)
 
         self.avgPool = nn.AvgPool3d(2, 2)
 
-        self.fc3 = nn.Linear(self.filters*16 * 8 * 8, out_channels)
+        self.fc3 = nn.Linear(self.filters*8 * 16 * 16, out_channels)
 
     def forward(self, X):                             # X.shape = (N,    1, 16, 256, 256)
         X = self.pool(self.conv1_bn(self.LRelu(self.conv1(X)))) # (N,   64,  8, 128, 128)
         X = self.pool(self.conv2_bn(self.LRelu(self.conv2(X)))) # (N,  128,  4,  64,  64)
         X = self.pool(self.conv3_bn(self.LRelu(self.conv3(X)))) # (N,  256,  2,  32,  32)
-        X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X)))) # (N,  512,  1,  16,  16)
-        X = self.conv5_bn(self.LRelu(self.conv5(X)))            # (N, 1024,  1,  16,  16)
-        X = self.avgPool(X)
+        # X = self.pool(self.conv4_bn(self.LRelu(self.conv4(X)))) # (N,  512,  2,  16,  16)
+        X = self.conv5_bn(self.LRelu(self.conv5(X)))            # (N, 512,   2,  32,  32)
+        X = self.avgPool(X)                                     # (N, 512,  1,   16,   16)
+
 
         # X.view(-1, Y) reshapes X to shape (batch_size, Y) for FC layer
-        X = X.view(-1, self.filters*16 * 8 * 8)
+        X = X.view(-1, self.filters*8 * 16 * 16)
         X = self.fc3(X)
 
         return X

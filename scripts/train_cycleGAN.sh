@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -t 0-12:00:00
-#SBATCH --mem=220G
+#SBATCH -t 0-02:00:00
+#SBATCH --mem=25G
 #SBATCH -J ArtifactNet
-#SBATCH -c 10
+#SBATCH -c 5
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
@@ -30,7 +30,7 @@ log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
-learn_rate=0.0008                        # Initial rate for the trainer
+learn_rate=0.0002                        # Initial rate for the trainer
 batch_size=1                             # Batch size for trainer
 aug_factor=1                             # Number of times to augment each image
 num_gpus=1                               # Number of GPUs to use for training
