@@ -1,4 +1,5 @@
 
+# from pytorch_lightning.logging import LightningLoggerBase, rank_zero_only, TensorBoardLogger
 
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.loggers import LightningLoggerBase
@@ -26,6 +27,39 @@ class TensorBoardCustom(TensorBoardLogger):
             return
         else :
             return
+
+    @rank_zero_only
+    def log_metrics(self, metrics, step):
+        # metrics is a dictionary of metric names and values
+        # Choose which metrics to plot
+        trg_metrics, val_metrics = {}, {}
+        for k, v in metrics.items() :
+            if k not in ['epoch'] :
+                # Don't log epoch number
+                if "val" in k :
+                    d = val_metrics
+                else :
+                    d = trg_metrics
+
+                if isinstance(v, dict) :
+                    # If there is a dictionary with more loss values, plot each one
+                    # for this to work, the key should have format d_loss or g_loss
+                    for k_i, v_i in v.items() :
+                        d[k_i] = v_i
+                        # self.experiment.add_scalar(f"{plot_name}/{k_i}", v_i, step)
+                else :
+                    d[k] = v
+                    # self.experiment.add_scalar(f"{plot_name}/{k}", v, step)
+
+        # Add both training and validation metrics to logger
+        self.experiment.add_scalars("trg_loss/", trg_metrics, step)
+        self.experiment.add_scalars("val_loss/", val_metrics, step)
+
+
+
+
+
+
 
     def add_mpl_img(self, tag, X, step) :
         """ Creates a matplotlib image out of a 4D tensor or list of

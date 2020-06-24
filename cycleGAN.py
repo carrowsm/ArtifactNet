@@ -87,6 +87,7 @@ class GAN(pl.LightningModule) :
         self.hparams = hparams
         self.image_size = image_size
         self.dimension = dimension
+        self.n_filters = hparams.n_filters
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
@@ -97,12 +98,12 @@ class GAN(pl.LightningModule) :
         # self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
         # self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
 
-        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=32)
-        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=32)
+        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=self.n_filters)
+        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=self.n_filters)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=32)
-        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=32)
+        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=self.n_filters)
+        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=self.n_filters)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -169,7 +170,7 @@ class GAN(pl.LightningModule) :
                                   )
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=5, drop_last=True,
+                                 shuffle=True, num_workers=2, drop_last=True,
                                  pin_memory=True
                                  )
         self.dataset_size = len(dataset)
@@ -193,7 +194,7 @@ class GAN(pl.LightningModule) :
                                   dim=self.dimension
                                   )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=False, num_workers=10, drop_last=True,
+                                 shuffle=False, num_workers=2, drop_last=True,
                                  pin_memory=True
                                  )
         return data_loader
@@ -260,21 +261,21 @@ class GAN(pl.LightningModule) :
             # Generator loss is the sum of these
             G_loss = loss_adv_Y + loss_adv_X + loss_cyc_X + loss_cyc_Y + loss_idt
 
+            g_loss_dict = {'G_total': G_loss,
+                           "G_idt":   loss_idt,
+                           "G_adv_Y": loss_adv_Y,
+                           "G_adv_X": loss_adv_X,
+                           "G_cyc_Y": loss_cyc_Y,
+                           "G_cyc_X": loss_cyc_X}
+
 
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'g_loss': G_loss}
-            output = OrderedDict({'loss': G_loss,
-                                  'progress_bar': tqdm_dict,
-                                  # 'log': tqdm_dict
+            output = OrderedDict({'loss': G_loss,              # A parameter for PT-lightning
+                                  'progress_bar': tqdm_dict,   # Will appear in progress bar
+                                  'log': g_loss_dict           # Will be plotted on tensorboard
                                   })
-            self.logger.experiment.add_scalars(f'g_loss/', {'total': G_loss,
-                                                           "idt": loss_idt,
-                                                           "adv_Y": loss_adv_Y,
-                                                           "adv_X": loss_adv_X,
-                                                           "cyc_Y": loss_cyc_Y,
-                                                           "cyc_X": loss_cyc_X},
-                                                           self.global_step)
 
         ### TRAIN DISCRIMINATORS ###
         if optimizer_idx == 1 :
@@ -295,7 +296,7 @@ class GAN(pl.LightningModule) :
             # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
 
-            D_loss = (loss_Dy + loss_Dx)
+            D_loss = (loss_Dy + loss_Dx) / 2
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}
@@ -303,12 +304,6 @@ class GAN(pl.LightningModule) :
                                   'progress_bar': tqdm_dict,
                                   'log': tqdm_dict
                                   })
-
-            # Plot loss every iteration
-            self.logger.experiment.add_scalar(f'd_loss', D_loss, self.global_step)
-
-
-
         ### ---------------------- ###
 
         return output
@@ -391,9 +386,6 @@ class GAN(pl.LightningModule) :
             d_loss_mean += output['d_loss_val'] / val_size
             g_loss_mean += output['g_loss_val'] / val_size
 
-        # Plot loss from this epoch
-        self.logger.experiment.add_scalar(f'val/d_loss', d_loss_mean, self.global_step)
-        self.logger.experiment.add_scalar(f'val/g_loss', g_loss_mean, self.global_step)
 
         tqdm_dict = {'d_loss_val': d_loss_mean.detach(),
                      'g_loss_val': g_loss_mean.detach()}
@@ -451,12 +443,12 @@ def main(hparams):
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px")
+    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px/strong_weak")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
-                         accumulate_grad_batches=10,
-                         # gradient_clip_val=0.9,
+                         # accumulate_grad_batches=10,
+                         gradient_clip_val=0.1,
                          # max_nb_epochs=hparams.max_num_epochs,
                          val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
@@ -464,7 +456,7 @@ def main(hparams):
                          num_nodes=1,
                          distributed_backend="ddp",
                          benchmark=True,
-                         profiler=True
+                         # profiler=True
                          )
 
     # ------------------------

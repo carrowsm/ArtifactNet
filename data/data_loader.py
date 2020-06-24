@@ -23,8 +23,8 @@ def load_image_data_frame(path) :
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
-    da_plus  = df[df["has_artifact"] == "1"]
-    da_minus = df[df["has_artifact"] == "0"]
+    da_plus  = df[df["has_artifact"] == "2"]
+    da_minus = df[df["has_artifact"] == "1"]
 
     return da_plus["DA_z"], da_minus["DA_z"]
 
@@ -312,6 +312,7 @@ class UnpairedDataset(t_data.Dataset):
         Y_tensor = self.transform(Y)
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
+        # or if the input image and model is 2D :   (batch_size, depth, height, width)
         # Reshape the arrays to add another dimension
         try :
             if self.dim == 2 :
@@ -325,9 +326,9 @@ class UnpairedDataset(t_data.Dataset):
             i = np.random.randint(0, self.x_size - 1)
             return self[i]
 
-
-
         return X_tensor, Y_tensor
+
+
 
 
     def __len__(self):
