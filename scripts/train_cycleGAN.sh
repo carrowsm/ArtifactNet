@@ -24,7 +24,6 @@ path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
 
 # Paths to data and logs
 csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
-# img_path="/cluster/projects/radiomics/Temp/RADCURE-npy/img"
 img_path="/cluster/projects/radiomics/Temp/colin/isotropic_npy/images"
 log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 
@@ -32,8 +31,9 @@ log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
 batch_size=2                             # Batch size for trainer
-aug_factor=1                             # Number of times to augment each image
+aug_factor=10                            # Number of times to augment each image
 num_gpus=1                               # Number of GPUs to use for training
+num_filters=16                           # Number of input filters for the model
 
 echo 'Started python script.'
 python $path \
@@ -43,5 +43,6 @@ python $path \
 --batch_size=$batch_size \
 --lr=$learn_rate \
 --augmentation_factor=$aug_factor \
---n_gpus=$num_gpus
+--n_gpus=$num_gpus \
+--n_filters=$num_filters
 echo 'Python script finished.'

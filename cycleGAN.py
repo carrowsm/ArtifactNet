@@ -165,7 +165,8 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  transform=None,
+                                  # transform=None,    # Default transform is affine
+                                                       # rotation and translation
                                   dim=self.dimension
                                   )
 
@@ -190,7 +191,7 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  transform=None,
+                                  # transform=None,
                                   dim=self.dimension
                                   )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,

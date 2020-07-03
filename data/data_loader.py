@@ -179,7 +179,10 @@ class UnpairedDataset(t_data.Dataset):
         self.y_img_centre = Y_image_centre
         self.image_size   = image_size
         self.transforms   = transforms.Compose([
-                             transforms.Normalize([-814.7], [615.9])
+                             torchvision.transforms.ToPILImage(),
+                             torchvision.transforms.RandomAffine(90, translate=(0.1, 0.1),
+                             scale=None, shear=None, resample=False, fillcolor=0)
+                             torchvision.transforms.ToTensor()
                              ])
 
 
@@ -266,21 +269,31 @@ class UnpairedDataset(t_data.Dataset):
     """ ########################## """
 
 
-
-    def lin_norm(self, array, newMin=0., newMax=1.) :
-        oldMin, oldMax = np.min(array), np.max(array)
-        return (array - oldMin) * ((newMax - newMin)/(oldMax - oldMin)) + newMin
-
     def transform(self, X) :
         """When we start using data augmentation we will call transform to
-        apply random rotations, translations etc to the data"""
+        apply random rotations, translations etc to the data
+        Parameters :
+        ------------
+        X (np.ndarray) :
+            The untransformed image in the form of a numpy ndarray.
+
+        Returns :
+        ----------
+        The transformed image as a pytorch 32-bit tensor.
+        """
+        # Transform the image to a pytorch tensor
+        X = torch.tensor(X, dtype=torch.float32)
+
+        # Apply the transformations
+        if self.transforms is not None :
+            X = self.transforms(X)                  # Apply augmentations
+
+        # Apply intensity windowing and scaling
         min_val = -1000.0
         max_val =  1000.0
-        X = np.clip(X, min_val, max_val)            # Make range (-1000, 1000)
-        X = torch.tensor(X, dtype=torch.float32)
-        # X = self.transforms(X)                    # Apply augmentations
-        # X = X / (max_val - min_val)               # Make range (0, 1)
+        X = torch.clamp(X, min=min_val, max=max_val)# Make range (-1000, 1000)
         X = X / 1000.0                              # Make range (-1, 1)
+
         return X
 
 
