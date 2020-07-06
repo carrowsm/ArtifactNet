@@ -7,7 +7,8 @@ from sklearn.utils import shuffle
 
 import torch
 import torch.utils.data as t_data
-import torchvision.transforms as transforms
+import torchvision
+import scipy.ndimage.rotate as rotate_img
 
 
 from data.sitk_processing import read_dicom_image, resample_image, read_nrrd_image
@@ -178,11 +179,20 @@ class UnpairedDataset(t_data.Dataset):
         self.x_img_centre = X_image_centre
         self.y_img_centre = Y_image_centre
         self.image_size   = image_size
-        self.transforms   = transforms.Compose([
-                             torchvision.transforms.ToPILImage(),
-                             torchvision.transforms.RandomAffine(90, translate=(0.1, 0.1),
-                             scale=None, shear=None, resample=False, fillcolor=0)
-                             torchvision.transforms.ToTensor()
+        self.transforms   = torchvision.transforms.Compose([
+                                torchvision.transforms.ToPILImage(),
+                                # torchvision.transforms.RandomAffine(
+                                #     90, translate=(0.1, 0.1), scale=None,
+                                #     shear=None, resample=False, fillcolor=0),
+                                torchio.RandomAffine(
+                                    scales=(0.9, 1.2),   # Zooming in/out
+                                    degrees=(90),        # Rotation
+                                    translation=(5, 5)   # Random rotation
+                                    isotropic=True,      # Same in all direction
+                                    default_pad_value='otsu',
+                                    image_interpolation='bspline',
+                                )
+                                torchvision.transforms.ToTensor()
                              ])
 
 
@@ -281,18 +291,21 @@ class UnpairedDataset(t_data.Dataset):
         ----------
         The transformed image as a pytorch 32-bit tensor.
         """
+
+        # Apply random rotation
+
         # Transform the image to a pytorch tensor
         X = torch.tensor(X, dtype=torch.float32)
-
-        # Apply the transformations
-        if self.transforms is not None :
-            X = self.transforms(X)                  # Apply augmentations
 
         # Apply intensity windowing and scaling
         min_val = -1000.0
         max_val =  1000.0
         X = torch.clamp(X, min=min_val, max=max_val)# Make range (-1000, 1000)
         X = X / 1000.0                              # Make range (-1, 1)
+
+        # Apply the transformations
+        if self.transforms is not None :
+            X = self.transforms(X)                  # Apply augmentations
 
         return X
 
@@ -316,13 +329,13 @@ class UnpairedDataset(t_data.Dataset):
         # Make datatype ints (not unsigned ints)
         X, Y = X.astype(np.int16), Y.astype(np.int16)
 
-        # Crop the image
-        X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
-        Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
-
         # Transform the image (augmentation)
         X_tensor = self.transform(X)
         Y_tensor = self.transform(Y)
+
+        # Crop the image
+        X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
+        Y = self.crop_img(Y, size=self.image_size, p=self.y_img_centre[y_index])
 
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # or if the input image and model is 2D :   (batch_size, depth, height, width)

@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -t 0-24:00:00
-#SBATCH --mem=10G
+#SBATCH -t 0-2:00:00
+#SBATCH --mem=20G
 #SBATCH -J ArtifactNet
-#SBATCH -c 3
+#SBATCH -c 8
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics

@@ -171,7 +171,7 @@ class GAN(pl.LightningModule) :
                                   )
 
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=2, drop_last=True,
+                                 shuffle=True, num_workers=4, drop_last=True,
                                  pin_memory=True
                                  )
         self.dataset_size = len(dataset)
@@ -191,11 +191,11 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  # transform=None,
+                                  transform=None,
                                   dim=self.dimension
                                   )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=False, num_workers=2, drop_last=True,
+                                 shuffle=False, num_workers=4, drop_last=True,
                                  pin_memory=True
                                  )
         return data_loader
