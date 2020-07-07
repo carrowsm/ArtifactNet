@@ -155,7 +155,6 @@ class GAN(pl.LightningModule) :
 
     @pl.data_loader
     def train_dataloader(self):
-
         # Train data loader
         dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
                                   self.n_train[ :, 1],           # Paths to DA- images
@@ -165,16 +164,21 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  # transform=None,    # Default transform is affine
-                                                       # rotation and translation
+                                  aug_factor=self.hparams.augmentation_factor,
+                                                             # If > 1, will apply
+                                                             # random rotations and
+                                                             # translations
                                   dim=self.dimension
                                   )
-
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=True, num_workers=4, drop_last=True,
+                                 shuffle=True,
+                                 num_workers=self.hparams.n_cpus - 1,
+                                 drop_last=True,
                                  pin_memory=True
                                  )
         self.dataset_size = len(dataset)
+
+        print(f"Using {len(dataset)} training images.")
 
         return data_loader
 
@@ -182,7 +186,6 @@ class GAN(pl.LightningModule) :
 
     @pl.data_loader
     def val_dataloader(self) :
-        # Validation data loader
         dataset = UnpairedDataset(self.y_valid[ :, 1],           # Paths to DA+ images
                                   self.n_valid[ :, 1],           # Paths to DA- images
                                   file_type="npy",
@@ -191,13 +194,20 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  transform=None,
-                                  dim=self.dimension
-                                  )
+                                  aug_factor=self.hparams.augmentation_factor,
+                                                             # If > 1, will apply
+                                                             # random rotations and
+                                                             # translations
+                                 dim=self.dimension
+                                 )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
-                                 shuffle=False, num_workers=4, drop_last=True,
+                                 shuffle=False,
+                                 num_workers=self.hparams.n_cpus - 1,
+                                 drop_last=True,
                                  pin_memory=True
                                  )
+        print(f"Using {len(dataset)} validation images.")
+
         return data_loader
 
 
@@ -236,7 +246,6 @@ class GAN(pl.LightningModule) :
             # Compute adversarial loss
             loss_adv_Y = self.adv_loss(d_y_gen_y, ones)
 
-
             ### Calculate G_X adversarial loss ###
             # Generate fake DA- images from real DA+ imgs
             gen_x = self.g_x(y)
@@ -268,8 +277,6 @@ class GAN(pl.LightningModule) :
                            "G_adv_X": loss_adv_X,
                            "G_cyc_Y": loss_cyc_Y,
                            "G_cyc_X": loss_cyc_X}
-
-
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'g_loss': G_loss}
@@ -306,10 +313,11 @@ class GAN(pl.LightningModule) :
                                   'log': tqdm_dict
                                   })
         ### ---------------------- ###
-
         return output
 
+
     def validation_step(self, batch, batch_idx):
+        print("Starting val step")
         # Get the images
         x, y = batch           # x == DA+ images, y == DA- images
 
@@ -352,7 +360,6 @@ class GAN(pl.LightningModule) :
         # Generator loss is the sum of these
         G_loss = loss_adv_Y + loss_adv_X + loss_cyc_X + loss_cyc_Y + loss_idt
         ### -- ------------- -- ###
-
 
         # Save the losses in a dictionary
         output = OrderedDict({'d_loss_val': D_loss,

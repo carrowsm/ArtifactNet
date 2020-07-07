@@ -10,7 +10,7 @@ parser = ArgumentParser()
 
 # Paths to data and logs
 parser.add_argument("--csv_path", type=str, default="",
-help="Path to the CSV containing all image DA statuses and DA locations")
+                    help="Path to the CSV containing all image DA statuses and DA locations")
 parser.add_argument("--img_dir", default=img_dir, type=str, help="Path to the input image data.")
 parser.add_argument("--log_dir", default=log_dir, type=str, help='Where to save results.')
 

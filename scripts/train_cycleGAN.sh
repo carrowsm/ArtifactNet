@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -t 0-2:00:00
-#SBATCH --mem=20G
+#SBATCH -t 2-0:00:00
+#SBATCH --mem-per-cpu=10G
 #SBATCH -J ArtifactNet
-#SBATCH -c 8
+#SBATCH -c 3
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
@@ -33,6 +33,7 @@ learn_rate=0.0002                        # Initial rate for the trainer
 batch_size=2                             # Batch size for trainer
 aug_factor=10                            # Number of times to augment each image
 num_gpus=1                               # Number of GPUs to use for training
+num_cpus=1                               # Number of workers for dataloaders
 num_filters=16                           # Number of input filters for the model
 
 echo 'Started python script.'
@@ -44,5 +45,6 @@ python $path \
 --lr=$learn_rate \
 --augmentation_factor=$aug_factor \
 --n_gpus=$num_gpus \
+--n_cpus=$num_cpus \
 --n_filters=$num_filters
 echo 'Python script finished.'
