@@ -8,10 +8,9 @@ from sklearn.utils import shuffle
 import torch
 import torch.utils.data as t_data
 import torchvision
-import scipy.ndimage.rotate as rotate_img
-
 
 from data.sitk_processing import read_dicom_image, resample_image, read_nrrd_image
+from data.augmentations import affine_transform
 
 
 
@@ -74,7 +73,8 @@ def load_img_names(dir, y_da_df=None, n_da_df=None, f_type="npy", suffix="", dat
         # Increase the size of each list of files by repeating each element
         # data_augmentation_factor times
         aug_train_files = np.repeat(train_files, data_augmentation_factor)
-        aug_test_files  = np.repeat(test_files,  data_augmentation_factor)
+        aug_test_files  = test_files
+        # aug_test_files  = np.repeat(test_files,  data_augmentation_factor)
 
         # Randomize the order of the arrays
         train = shuffle(aug_train_files, random_state=0)
@@ -168,7 +168,7 @@ class UnpairedDataset(t_data.Dataset):
                  Y_image_centre=None,
                  file_type="nrrd",
                  image_size=None,
-                 transform=None,
+                 aug_factor=1,
                  dim=3):
 
         self.dim          = dim
@@ -179,21 +179,22 @@ class UnpairedDataset(t_data.Dataset):
         self.x_img_centre = X_image_centre
         self.y_img_centre = Y_image_centre
         self.image_size   = image_size
-        self.transforms   = torchvision.transforms.Compose([
-                                torchvision.transforms.ToPILImage(),
-                                # torchvision.transforms.RandomAffine(
-                                #     90, translate=(0.1, 0.1), scale=None,
-                                #     shear=None, resample=False, fillcolor=0),
-                                torchio.RandomAffine(
-                                    scales=(0.9, 1.2),   # Zooming in/out
-                                    degrees=(90),        # Rotation
-                                    translation=(5, 5)   # Random rotation
-                                    isotropic=True,      # Same in all direction
-                                    default_pad_value='otsu',
-                                    image_interpolation='bspline',
-                                )
-                                torchvision.transforms.ToTensor()
-                             ])
+        self.aug_factor   = aug_factor
+        # self.transforms   = torchvision.transforms.Compose([
+                                # torchvision.transforms.ToPILImage(),
+                                # # torchvision.transforms.RandomAffine(
+                                # #     90, translate=(0.1, 0.1), scale=None,
+                                # #     shear=None, resample=False, fillcolor=0),
+                                # torchio.RandomAffine(
+                                #     scales=(0.9, 1.2),   # Zooming in/out
+                                #     degrees=(90),        # Rotation
+                                #     translation=(5, 5)   # Random rotation
+                                #     isotropic=True,      # Same in all direction
+                                #     default_pad_value='otsu',
+                                #     image_interpolation='bspline',
+                                # )
+                                # torchvision.transforms.ToTensor()
+                             # ])
 
 
         # Total number of images (max from either class)
@@ -292,20 +293,18 @@ class UnpairedDataset(t_data.Dataset):
         The transformed image as a pytorch 32-bit tensor.
         """
 
-        # Apply random rotation
-
-        # Transform the image to a pytorch tensor
-        X = torch.tensor(X, dtype=torch.float32)
+        if self.aug_factor > 1 :
+            # Apply random rotation
+            X = affine_transform(X, angle=30.0, pixels=(20, 20))
+            X = torch.tensor(X, dtype=torch.float32)
+        else :
+            X = torch.tensor(X, dtype=torch.float32)
 
         # Apply intensity windowing and scaling
         min_val = -1000.0
         max_val =  1000.0
         X = torch.clamp(X, min=min_val, max=max_val)# Make range (-1000, 1000)
         X = X / 1000.0                              # Make range (-1, 1)
-
-        # Apply the transformations
-        if self.transforms is not None :
-            X = self.transforms(X)                  # Apply augmentations
 
         return X
 
@@ -321,7 +320,6 @@ class UnpairedDataset(t_data.Dataset):
         x_index = index
         y_index = np.random.randint(0, self.y_size - 1)
 
-
         # Load the image from each class
         X = self.load_img(self.x_img_paths[x_index])
         Y = self.load_img(self.y_img_paths[y_index])
@@ -330,8 +328,8 @@ class UnpairedDataset(t_data.Dataset):
         X, Y = X.astype(np.int16), Y.astype(np.int16)
 
         # Transform the image (augmentation)
-        X_tensor = self.transform(X)
-        Y_tensor = self.transform(Y)
+        X = self.transform(X)
+        Y = self.transform(Y)
 
         # Crop the image
         X = self.crop_img(X, size=self.image_size, p=self.x_img_centre[x_index])
@@ -342,17 +340,17 @@ class UnpairedDataset(t_data.Dataset):
         # Reshape the arrays to add another dimension
         try :
             if self.dim == 2 :
-                X_tensor = X_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
-                Y_tensor = Y_tensor.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+                X = X.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+                Y = Y.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
             else :
-                X_tensor = X_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-                Y_tensor = Y_tensor.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        except :
+                X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+                Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        except RuntimeError :
             print("image not found")
             i = np.random.randint(0, self.x_size - 1)
             return self[i]
 
-        return X_tensor, Y_tensor
+        return X, Y
 
 
 
