@@ -28,6 +28,8 @@ parser.add_argument("--max_num_epochs", type=int, default=100,
                     help="Maximum number of epochs to train for.")
 parser.add_argument("--n_gpus", type=int, default=1,
                     help="Number of GPUs to use for training")
+parser.add_argument("--n_cpus", type=int, default=1,
+                    help="Number of parallel workers to use for data loading.")
 
 ### Model selection and training parameters ###
 parser.add_argument("--half_precision", type=bool, default=False,
