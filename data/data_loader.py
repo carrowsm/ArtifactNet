@@ -321,8 +321,8 @@ class UnpairedDataset(t_data.Dataset):
         y_index = np.random.randint(0, self.y_size - 1)
 
         # Load the image from each class
-        X = self.load_img(self.x_img_paths[x_index])
-        Y = self.load_img(self.y_img_paths[y_index])
+        X = self.load_img(self.x_img_paths[x_index], mmap_mode="r")
+        Y = self.load_img(self.y_img_paths[y_index], mmap_mode="r")
 
         # Make datatype ints (not unsigned ints)
         X, Y = X.astype(np.int16), Y.astype(np.int16)
@@ -347,6 +347,7 @@ class UnpairedDataset(t_data.Dataset):
                 Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
         except RuntimeError :
             print("image not found")
+            print(X.shape, Y.shape)
             i = np.random.randint(0, self.x_size - 1)
             return self[i]
 

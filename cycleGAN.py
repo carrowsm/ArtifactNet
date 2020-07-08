@@ -3,7 +3,7 @@ This script trains a cycleGAN neural network to remove dental artifacts (DA)
 from RadCure CT image volumes.
 
 To begin training this model on H4H, run
-$ sbatch train_cycleGAN.sh
+$ sbatch scripts/train_cycleGAN.sh
 """
 
 import os
@@ -194,11 +194,8 @@ class GAN(pl.LightningModule) :
                                   X_image_centre=None, # Imgs are preprocessed to be cropped
                                   Y_image_centre=None, # around DA
                                   image_size=self.image_size,
-                                  aug_factor=self.hparams.augmentation_factor,
-                                                             # If > 1, will apply
-                                                             # random rotations and
-                                                             # translations
-                                 dim=self.dimension
+                                  aug_factor=1,        # Don't apply augmentations
+                                  dim=self.dimension
                                  )
         data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
                                  shuffle=False,
@@ -457,14 +454,13 @@ def main(hparams):
     trainer = pl.Trainer(logger=logger,
                          # accumulate_grad_batches=10,
                          gradient_clip_val=0.1,
-                         # max_nb_epochs=hparams.max_num_epochs,
                          val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
                          num_nodes=1,
                          distributed_backend="ddp",
                          benchmark=True,
-                         # profiler=True
+                         val_check_interval=0.05    # Check validation 20 times per epoch
                          )
 
     # ------------------------
