@@ -39,6 +39,9 @@ parser.add_argument("--architecture", type=str, default="cycleGAN_3D",
                     help="'cycleGAN_2D', 'cycleGAN_3D', or 'pix2pix' are accepted.")
 parser.add_argument("--n_filters", type=int, default=32,
                     help="Number of input filters to use in generator and discriminator.")
+parser.add_argument("--image_size", type=list, default=[16, 256, 256],
+                    help="The size of the image in pixels. If a list of length 3, the image will \
+be 3D with shape [z, y, x]. If a list of length 2, the image with be 2D with shape [y, x].")
 
 
 

@@ -27,14 +27,17 @@ csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
 img_path="/cluster/projects/radiomics/Temp/colin/isotropic_npy/images"
 log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 
+### EDIT BELOW ###
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=2                             # Batch size for trainer
+batch_size=4                             # Batch size for trainer
 aug_factor=10                            # Number of times to augment each image
 num_gpus=1                               # Number of GPUs to use for training
-num_cpus=1                               # Number of workers for dataloaders
+num_cpus=3                               # Number of workers for dataloaders
 num_filters=16                           # Number of input filters for the model
+image_size=[8, 256, 256]                 # The dimensions of the training image
+### ---------- ###
 
 echo 'Started python script.'
 python $path \
@@ -46,5 +49,6 @@ python $path \
 --augmentation_factor=$aug_factor \
 --n_gpus=$num_gpus \
 --n_cpus=$num_cpus \
---n_filters=$num_filters
+--n_filters=$num_filters \
+--image_size=$image_size
 echo 'Python script finished.'
