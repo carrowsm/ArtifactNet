@@ -241,6 +241,118 @@ class UNet3D(nn.Module):
         )
 
 
+class UNet3D_3layer(nn.Module):
+
+    def __init__(self, in_channels=1, out_channels=1, init_features=64):
+        super(UNet3D, self).__init__()
+
+        features = init_features
+        ### ENCODER ###
+        """
+            Use the original U-Net architecture from the original paper:
+            https://arxiv.org/abs/1505.04597
+            GitHub: https://github.com/milesial/Pytorch-UNet
+        """
+        self.features = init_features
+        self.encoder1 = self.conv_relu(in_channels, features, name="enc1")
+        self.pool1 = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.encoder2 = self.conv_relu(features, features * 2, name="enc2")
+        self.pool2 = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.encoder3 = self.conv_relu(features * 2, features * 4, name="enc3")
+        self.pool3 = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        # self.encoder4 = self.conv_relu(features * 4, features * 8, name="enc4")
+        # self.pool4 = nn.MaxPool3d(kernel_size=2, stride=2)
+        ### ------- ###
+
+        self.bottleneck = self.conv_relu(features * 4, features * 8, name="bottleneck")
+
+        ### DECODER ###
+        # self.upconv4 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=2, stride=2, padding=0)
+        # self.decoder4 = self.conv_relu((features * 8) * 2, features * 8, name="dec4")
+
+        self.upconv3 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=2, stride=2)
+        self.decoder3 = self.conv_relu((features * 4) * 2, features * 4, name="dec3")
+
+        self.upconv2 = nn.ConvTranspose3d(features * 4, features * 2, kernel_size=2, stride=2)
+        self.decoder2 = self.conv_relu((features * 2) * 2, features * 2, name="dec2")
+
+        self.upconv1 = nn.ConvTranspose3d(features * 2, features, kernel_size=2, stride=2)
+        self.decoder1 = self.conv_relu(features * 2, features, name="dec1")
+
+        self.conv = nn.Conv3d(in_channels=features, out_channels=out_channels, kernel_size=1)
+        ### ------- ###
+
+
+    def forward(self, x):                                  # (N, 1,    8, 256, 256)
+        enc1 = self.encoder1(x)                            # (N, 64,   8, 256, 256)
+        enc2 = self.encoder2(self.pool1(enc1))             # (N, 128,  4, 128, 128)
+        enc3 = self.encoder3(self.pool2(enc2))             # (N, 256,  2,  64,  64)
+
+        x = self.bottleneck(self.pool4(enc4))              # (N, 512, 1,  16,  16)
+
+        # x = self.upconv4(x)                                # (N, 512, 2,   32,  32)
+        # x = torch.cat((x, enc4), dim=1)                    # (N,1024, 2,   32,  32)
+        # x = self.decoder4(x)                               # (N, 512, 2,   32,  32)
+        x = self.upconv3(x)                                # (N, 256, 4,   64,  64)
+        x = torch.cat((x, enc3), dim=1)                    # (N, 512, 4,   64,  64)
+        x = self.decoder3(x)                               # (N, 256, 4,   64,  64)
+        x = self.upconv2(x)                                # (N, 128, 8,  128, 128)
+        x = torch.cat((x, enc2), dim=1)                    # (N, 256, 8,  128, 128)
+        x = self.decoder2(x)                               # (N, 128, 8,  128, 128)
+        x = self.upconv1(x)                                # (N,  64, 16, 256, 256)
+        x = torch.cat((x, enc1), dim=1)                    # (N, 128, 16, 256, 256)
+        x = self.decoder1(x)                               # (N,  64, 16, 256, 256)
+        x = self.conv(x)                                   # (N,   1, 16, 256, 256)
+
+        return x
+
+
+    @staticmethod
+    def conv_relu(in_channels, features, name):
+        '''Perform:
+        1. 3d convolution, kernel=3, padding=1, so output_size=input_size
+        2. Batch normalization
+        3. Relu
+        4. Another convolution, with same input and output size
+        5. batch normalization
+        6. Relu'''
+        normfunc = nn.BatchNorm3d
+        return nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        name + "conv1",
+                        nn.Conv3d(
+                            in_channels=in_channels,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                    ),
+                    (name + "norm1", normfunc(num_features=features)),
+                    (name + "relu1", nn.ReLU(inplace=False)),
+                    (
+                        name + "conv2",
+                        nn.Conv3d(
+                            in_channels=features,
+                            out_channels=features,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                    ),
+                    (name + "norm2", normfunc(num_features=features)),
+                    (name + "relu2", nn.ReLU(inplace=False)),
+                ]
+            )
+        )
+
+
+
 
 class ResNetK(nn.Module):
     """A generator following the ResNet architecture with K residual
