@@ -71,6 +71,8 @@ class GAN(pl.LightningModule) :
         hparams (dict) :
             Should include all hyperparameters as well as paths to data and CSV
             of labels.
+    Attributes :
+    ------------
         image_size (list, length of 3) :
             A list representing the 3D shape of the images to be to used, indexed
             as (z_size, y_size, x_size). To use a single CT slice, pass
@@ -83,24 +85,17 @@ class GAN(pl.LightningModule) :
             network will be used.
     """
 
-    def __init__(self, hparams, image_size=[1, 256, 256], dimension=3):
+    def __init__(self, hparams):
         super(GAN, self).__init__()
         self.hparams = hparams
-        self.image_size = image_size
-        self.dimension = dimension
+        self.image_size = hparams.image_size
+        self.dimension = len(hparams.image_size)
         self.n_filters = hparams.n_filters
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
-        # self.g_y = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
-        # self.g_x = UNet2D(in_channels=image_size[0], out_channels=image_size[0], init_features=64)
-        #
-        # # One discriminator to identify real DA+ images, another for DA- images
-        # self.d_y = CNN_2D(in_channels=image_size[0], out_channels=1)
-        # self.d_x = CNN_2D(in_channels=image_size[0], out_channels=1)
-
-        self.g_y = UNet3D(in_channels=1, out_channels=1, init_features=self.n_filters)
-        self.g_x = UNet3D(in_channels=1, out_channels=1, init_features=self.n_filters)
+        self.g_y = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
+        self.g_x = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
 
         # One discriminator to identify real DA+ images, another for DA- images
         self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=self.n_filters)
@@ -415,15 +410,13 @@ class GAN(pl.LightningModule) :
         Define two optimizers (D & G), each with its own learning rate scheduler.
         """
         lr = self.hparams.lr
-        G_lr = lr
-        D_lr = lr
-        b1 = self.hparams.b1
-        b2 = self.hparams.b2
+        b1, b2 = self.hparams.b1, self.hparams.b2
+
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
-                                 self.g_y.parameters()), lr=G_lr, betas=(b1, b2),
+                                 self.g_y.parameters()), lr=lr, betas=(b1, b2),
                                  weight_decay=self.hparams.weight_decay)
         opt_d = torch.optim.Adam(itertools.chain(self.d_x.parameters(),
-                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2),
+                                 self.d_y.parameters()), lr=lr, betas=(b1, b2),
                                  weight_decay=self.hparams.weight_decay)
 
         # Decay generator learning rate by factor every milestone[i] epochs
@@ -451,7 +444,7 @@ def main(hparams):
     # ------------------------
     # 1 INIT LIGHTNING MODEL
     # ------------------------
-    model = GAN(hparams, image_size=[16, 256, 256], dimension=3)
+    model = GAN(hparams)
 
     # ------------------------
     # 2 INIT TRAINER
