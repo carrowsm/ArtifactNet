@@ -19,6 +19,7 @@ import torch.nn as nn
 import torchvision
 
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 import torchvision.transforms as transforms
@@ -109,28 +110,8 @@ class GAN(pl.LightningModule) :
         # Put networks on GPUs
         self.gpu_check()
 
-        # Get train and test data sets
-        # Import CSV containing DA labels
-        y_df, n_df = load_image_data_frame(hparams.csv_path)
-
-        # Create train and test sets for each DA+ and DA- imgs
-        files = load_img_names(hparams.img_dir,
-                               y_da_df=y_df, n_da_df=n_df,
-                               f_type="npy", suffix="",
-                               data_augmentation_factor=hparams.augmentation_factor,
-                               test_size=0.25)
-        self.y_train, self.n_train, self.y_valid, self.n_valid = files
-        """
-        y == DA+, n == DA-
-        y_train is a matrix with len N and two columns:
-        y_train[:, 0] = z-index of DA in each patient
-        y_train[:, 1] = full path to each patient's image file
-        """
-
         # Define loss functions
         self.l1_loss  = nn.L1Loss(reduction="mean")
-        # self.adv_loss = nn.MSELoss(reduction="mean")
-        # self.adv_loss = nn.BCELoss()
         self.adv_loss = nn.BCEWithLogitsLoss() # Compatible with amp 16-bit
 
         # Define loss term coefficients
@@ -153,58 +134,79 @@ class GAN(pl.LightningModule) :
                 print("Memory allocated: ", nbytes)
 
 
+    def prepare_data(self) :
+        """ Load the image file names, create dataset objects.
+        Called automatically by pytorch lightning.
+        """
+        # Get train and test data sets
+        # Import CSV containing DA labels
+        y_df, n_df = load_image_data_frame(hparams.csv_path)
+
+        # Create train and test sets for each DA+ and DA- imgs
+        files = load_img_names(hparams.img_dir,
+                               y_da_df=y_df, n_da_df=n_df,
+                               f_type="npy", suffix="",
+                               data_augmentation_factor=hparams.augmentation_factor,
+                               test_size=0.25)  # Use 25% of train data for validation
+        self.y_train, self.n_train, self.y_valid, self.n_valid = files
+        """ y == DA+, n == DA-
+            y_train is a matrix with len N and two columns:
+            y_train[:, 0] = z-index of DA in each patient
+            y_train[:, 1] = full path to each patient's image file
+        """
+        # Train data loader
+        trg_dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
+                                      self.n_train[ :, 1],           # Paths to DA- images
+                                      file_type="npy",
+                                      # X_image_centre=self.y_train[:, 0], # DA slice index
+                                      # Y_image_centre=self.n_train[:, 0], # Mouth slice index
+                                      X_image_centre=None, # Imgs are preprocessed to be cropped
+                                      Y_image_centre=None, # around DA
+                                      image_size=self.image_size,
+                                      aug_factor=self.hparams.augmentation_factor,
+                                      dim=self.dimension)
+        val_dataset = UnpairedDataset(self.y_valid[ :, 1],           # Paths to DA+ images
+                                      self.n_valid[ :, 1],           # Paths to DA- images
+                                      file_type="npy",
+                                      X_image_centre=None, # Imgs are preprocessed to be cropped
+                                      Y_image_centre=None, # around DA
+                                      image_size=self.image_size,
+                                      aug_factor=1,        # Don't apply augmentations
+                                      dim=self.dimension)
+
+        self.trg_dataset = trg_dataset
+        self.val_dataset = val_dataset
+
+
+    def on_train_start(self):
+        """ Print some info before training starts """
+        print("\nDataset sizes")
+        print("=============")
+        print(f"Training:   {len(self.trg_dataset)}")
+        print(f"Validation: {len(self.val_dataset)}")
+
+
     @pl.data_loader
     def train_dataloader(self):
-        # Train data loader
-        dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
-                                  self.n_train[ :, 1],           # Paths to DA- images
-                                  file_type="npy",
-                                  # X_image_centre=self.y_train[:, 0], # DA slice index
-                                  # Y_image_centre=self.n_train[:, 0], # Mouth slice index
-                                  X_image_centre=None, # Imgs are preprocessed to be cropped
-                                  Y_image_centre=None, # around DA
-                                  image_size=self.image_size,
-                                  aug_factor=self.hparams.augmentation_factor,
-                                                             # If > 1, will apply
-                                                             # random rotations and
-                                                             # translations
-                                  dim=self.dimension
-                                  )
-        data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
+        data_loader = DataLoader(self.trg_dataset,
+                                 batch_size=self.hparams.batch_size,
                                  shuffle=True,
                                  num_workers=self.hparams.n_cpus - 1,
                                  drop_last=True,
-                                 pin_memory=True
-                                 )
-        self.dataset_size = len(dataset)
-
-        print(f"Using {len(dataset)} training images.")
-
+                                 pin_memory=True)
+        self.dataset_size = len(self.trg_dataset)
         return data_loader
 
 
 
     @pl.data_loader
     def val_dataloader(self) :
-        dataset = UnpairedDataset(self.y_valid[ :, 1],           # Paths to DA+ images
-                                  self.n_valid[ :, 1],           # Paths to DA- images
-                                  file_type="npy",
-                                  # X_image_centre=self.y_valid[:, 0], # DA slice index
-                                  # Y_image_centre=self.n_valid[:, 0], # Mouth slice index
-                                  X_image_centre=None, # Imgs are preprocessed to be cropped
-                                  Y_image_centre=None, # around DA
-                                  image_size=self.image_size,
-                                  aug_factor=1,        # Don't apply augmentations
-                                  dim=self.dimension
-                                 )
-        data_loader = DataLoader(dataset, batch_size=self.hparams.batch_size,
+        data_loader = DataLoader(self.val_dataset,
+                                 batch_size=self.hparams.batch_size,
                                  shuffle=False,
                                  num_workers=self.hparams.n_cpus - 1,
                                  drop_last=True,
-                                 pin_memory=True
-                                 )
-        print(f"Using {len(dataset)} validation images.")
-
+                                 pin_memory=True)
         return data_loader
 
 
@@ -378,22 +380,28 @@ class GAN(pl.LightningModule) :
                           gen_y[0, 0, self.image_size[0] // 2, :, :].cpu()]
 
             # Plot the image
-            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}', images, self.global_step)
+            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}',
+                                    np.clip(images, -1.0, 1.0).tolist(),
+                                    self.global_step)
 
         return output
 
 
     def validation_epoch_end(self, outputs):
-        g_loss_mean, d_loss_mean = 0, 0
+        g_loss_mean, d_loss_mean, overall_loss = 0, 0, 0
         val_size = len(outputs)
 
         for output in outputs: # Average over all val batches
             d_loss_mean += output['d_loss_val'] / val_size
             g_loss_mean += output['g_loss_val'] / val_size
+            overall_loss += output['d_loss_val'] / val_size +\
+                           output['g_loss_val'] / val_size
 
 
         tqdm_dict = {'d_loss_val': d_loss_mean.detach(),
-                     'g_loss_val': g_loss_mean.detach()}
+                     'g_loss_val': g_loss_mean.detach(),
+                     "val_loss": overall_loss.detach()
+                     }
 
         # show val_acc in progress bar but only log val_loss
         results = {'progress_bar': tqdm_dict,
@@ -412,9 +420,11 @@ class GAN(pl.LightningModule) :
         b1 = self.hparams.b1
         b2 = self.hparams.b2
         opt_g = torch.optim.Adam(itertools.chain(self.g_x.parameters(),
-                                self.g_y.parameters()), lr=G_lr, betas=(b1, b2))
+                                 self.g_y.parameters()), lr=G_lr, betas=(b1, b2),
+                                 weight_decay=self.hparams.weight_decay)
         opt_d = torch.optim.Adam(itertools.chain(self.d_x.parameters(),
-                                self.d_y.parameters()), lr=D_lr, betas=(b1, b2))
+                                 self.d_y.parameters()), lr=D_lr, betas=(b1, b2),
+                                 weight_decay=self.hparams.weight_decay)
 
         # Decay generator learning rate by factor every milestone[i] epochs
         # scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[10, 11, 12, 13, 14, 15], gamma=0.5)
@@ -443,12 +453,23 @@ def main(hparams):
     # ------------------------
     model = GAN(hparams, image_size=[16, 256, 256], dimension=3)
 
-
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
     logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px/strong_weak")
+
+    # ------------------------
+    # 3 INIT CHECKPOINTING
+    # ------------------------
+    checkpoint_path = os.path.join(logger.experiment.get_logdir(),
+                                   "checkpoints",
+                                   "{epoch:02d}")
+    checkpoint_callback = ModelCheckpoint(filepath=checkpoint_path,
+                                          # save_last=True,
+                                          save_top_k=1,
+                                          monitor="val_loss",
+                                          mode="min")
 
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
@@ -460,11 +481,11 @@ def main(hparams):
                          num_nodes=1,
                          distributed_backend="ddp",
                          benchmark=True,
-                         val_check_interval=0.05    # Check validation 20 times per epoch
+                         val_check_interval=0.1    # Check validation 10 times per epoch
                          )
 
     # ------------------------
-    # 3 START TRAINING
+    # 4 START TRAINING
     # ------------------------
     trainer.fit(model)
 

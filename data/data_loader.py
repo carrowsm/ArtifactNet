@@ -338,18 +338,18 @@ class UnpairedDataset(t_data.Dataset):
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # or if the input image and model is 2D :   (batch_size, depth, height, width)
         # Reshape the arrays to add another dimension
-        try :
-            if self.dim == 2 :
-                X = X.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
-                Y = Y.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
-            else :
-                X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-                Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        except RuntimeError :
-            print("image not found")
-            print(X.shape, Y.shape)
-            i = np.random.randint(0, self.x_size - 1)
-            return self[i]
+        # try :
+        if self.dim == 2 :
+            X = X.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+            Y = Y.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+        else :
+            X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+            Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+        # except RuntimeError :
+        #     print("image not found")
+        #     print(X.shape, Y.shape)
+        #     i = np.random.randint(0, self.x_size - 1)
+        #     return self[i]
 
         return X, Y
 
