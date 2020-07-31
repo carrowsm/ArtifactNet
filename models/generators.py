@@ -244,7 +244,7 @@ class UNet3D(nn.Module):
 class UNet3D_3layer(nn.Module):
 
     def __init__(self, in_channels=1, out_channels=1, init_features=64):
-        super(UNet3D, self).__init__()
+        super(UNet3D_3layer, self).__init__()
 
         features = init_features
         ### ENCODER ###
@@ -273,7 +273,7 @@ class UNet3D_3layer(nn.Module):
         # self.upconv4 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=2, stride=2, padding=0)
         # self.decoder4 = self.conv_relu((features * 8) * 2, features * 8, name="dec4")
 
-        self.upconv3 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=2, stride=2)
+        self.upconv3 = nn.ConvTranspose3d(features * 8, features * 4, kernel_size=2, stride=2, padding=0)
         self.decoder3 = self.conv_relu((features * 4) * 2, features * 4, name="dec3")
 
         self.upconv2 = nn.ConvTranspose3d(features * 4, features * 2, kernel_size=2, stride=2)
@@ -290,9 +290,7 @@ class UNet3D_3layer(nn.Module):
         enc1 = self.encoder1(x)                            # (N, 64,   8, 256, 256)
         enc2 = self.encoder2(self.pool1(enc1))             # (N, 128,  4, 128, 128)
         enc3 = self.encoder3(self.pool2(enc2))             # (N, 256,  2,  64,  64)
-
-        x = self.bottleneck(self.pool4(enc4))              # (N, 512, 1,  16,  16)
-
+        x = self.bottleneck(self.pool3(enc3))              # (N, 512, 1,  32,  32)
         # x = self.upconv4(x)                                # (N, 512, 2,   32,  32)
         # x = torch.cat((x, enc4), dim=1)                    # (N,1024, 2,   32,  32)
         # x = self.decoder4(x)                               # (N, 512, 2,   32,  32)

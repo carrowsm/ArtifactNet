@@ -31,8 +31,8 @@ from config.options import get_args
 
 from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
 
-from models.generators import UNet3D, ResNetK, UNet2D
-from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNN_NLayer, CNN_2D, VGG2D
+from models.generators import UNet3D, ResNetK, UNet2D, UNet3D_3layer
+from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNNnLayer, CNN_2D, VGG2D
 from util.helper_functions import set_requires_grad
 from util.loggers import TensorBoardCustom
 
@@ -98,8 +98,8 @@ class GAN(pl.LightningModule) :
         self.g_x = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNN_3D(in_channels=1, out_channels=1, init_features=self.n_filters)
-        self.d_x = CNN_3D(in_channels=1, out_channels=1, init_features=self.n_filters)
+        self.d_y = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters, n_layers=3, in_shape=self.image_size)
+        self.d_x = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters, n_layers=3, in_shape=self.image_size)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -376,8 +376,9 @@ class GAN(pl.LightningModule) :
 
             # Plot the image
             self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}',
-                                    np.clip(images, -1.0, 1.0).tolist(),
-                                    self.global_step)
+                                    images,
+                                    self.global_step,
+                                    clip_vals=True)
 
         return output
 
@@ -450,7 +451,7 @@ def main(hparams):
     # 2 INIT TRAINER
     # ------------------------
     # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="16_256_256px/strong_weak")
+    logger = TensorBoardCustom(hparams.log_dir, name="8_256_256px/strong_weak")
 
     # ------------------------
     # 3 INIT CHECKPOINTING
