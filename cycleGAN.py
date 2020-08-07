@@ -479,7 +479,7 @@ def main(hparams):
                          )
 
     # ------------------------
-    # 4 START TRAINING
+    # 4 START TRAINING /
     # ------------------------
     trainer.fit(model)
 
