@@ -42,6 +42,10 @@ parser.add_argument("--n_filters", type=int, default=32,
 parser.add_argument("--image_size", type=int, nargs="*", default=[16, 256, 256],
                     help="The size of the image in pixels. If a list of length 3, the image will \
 be 3D with shape [z, y, x]. If a list of length 2, the image with be 2D with shape [y, x].")
+parser.add_argument("--img_domain", type=str, default="s-w",
+                    help="The direction to train the image translation. Either 's-w', 'w-n', or 's-n'.")
+parser.add_argument("--checkpoint", type=str, default="None",
+                    help="The path to a checkpoint file. If 'None', training will start from scratch.")
 
 
 
