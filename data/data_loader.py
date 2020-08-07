@@ -14,19 +14,31 @@ from data.augmentations import affine_transform
 
 
 
-def load_image_data_frame(path) :
-    """ Load data Frame containing the DA label and location of each patient"""
+def load_image_data_frame(path, img_X, img_Y, label_col="has_artifact") :
+    """ Load data Frame containing the DA label and location of each patient
+    Parameters :
+    ------------
+    path (str) :    Full path to the CSV containing the image IDs and corresponding
+                    labels.
+    X_label (str) : The CSV label for images in domain X. These labels are in the
+                    column col_name in the CSV.
+    Y_label (str) : The CSV label for images in domain Y.
+    label_col (str): The CSV column name containing the image labels. Default is
+                    'has_artifact'.
+    Returns :
+    ---------
+    One list for each image domain with the z-index of the DA slice for each patient. 
+    """
     df = pd.read_csv(path,
-                     # index_col="patient_id",
-                     usecols=["patient_id", "has_artifact", "DA_z"],
+                     usecols=["patient_id", label_col, "DA_z"],
                      dtype=str, na_values=['nan', 'NaN', ''])
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
-    da_plus  = df[df["has_artifact"] == "2"]
-    da_minus = df[df["has_artifact"] == "1"]
+    X_df = df[df[label_col] == img_X]  # Patients in domain X (DA+)
+    Y_df = df[df[label_col] == img_Y]  # Patients in domain X (DA-)
 
-    return da_plus["DA_z"], da_minus["DA_z"]
+    return X_df["DA_z"], Y_df["DA_z"]
 
 
 
@@ -172,7 +184,6 @@ class UnpairedDataset(t_data.Dataset):
                  dim=3):
 
         self.dim          = dim
-        # self.root_dir     = image_root_dir
         self.x_img_paths  = X_image_names # Paths to images in domain X
         self.y_img_paths  = Y_image_names # Paths to images in domain Y
         self.file_type    = file_type
@@ -180,22 +191,6 @@ class UnpairedDataset(t_data.Dataset):
         self.y_img_centre = Y_image_centre
         self.image_size   = image_size
         self.aug_factor   = aug_factor
-        # self.transforms   = torchvision.transforms.Compose([
-                                # torchvision.transforms.ToPILImage(),
-                                # # torchvision.transforms.RandomAffine(
-                                # #     90, translate=(0.1, 0.1), scale=None,
-                                # #     shear=None, resample=False, fillcolor=0),
-                                # torchio.RandomAffine(
-                                #     scales=(0.9, 1.2),   # Zooming in/out
-                                #     degrees=(90),        # Rotation
-                                #     translation=(5, 5)   # Random rotation
-                                #     isotropic=True,      # Same in all direction
-                                #     default_pad_value='otsu',
-                                #     image_interpolation='bspline',
-                                # )
-                                # torchvision.transforms.ToTensor()
-                             # ])
-
 
         # Total number of images (max from either class)
         self.x_size = len(X_image_names)
@@ -209,8 +204,6 @@ class UnpairedDataset(t_data.Dataset):
         self.crop_img = self.get_cropper()
 
         self.count = 0
-
-
 
 
     def get_img_loader(self) :
@@ -338,18 +331,12 @@ class UnpairedDataset(t_data.Dataset):
         # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
         # or if the input image and model is 2D :   (batch_size, depth, height, width)
         # Reshape the arrays to add another dimension
-        # try :
         if self.dim == 2 :
             X = X.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
             Y = Y.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
         else :
             X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
             Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
-        # except RuntimeError :
-        #     print("image not found")
-        #     print(X.shape, Y.shape)
-        #     i = np.random.randint(0, self.x_size - 1)
-        #     return self[i]
 
         return X, Y
 
