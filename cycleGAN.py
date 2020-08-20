@@ -85,12 +85,13 @@ class GAN(pl.LightningModule) :
             network will be used.
     """
 
-    def __init__(self, hparams):
+    def __init__(self, hparams=None):
         super(GAN, self).__init__()
         self.hparams = hparams
         self.image_size = hparams.image_size
         self.dimension = len(hparams.image_size)
         self.n_filters = hparams.n_filters
+        self.cnn_layers = hparams.cnn_layers
 
         ### Initialize Networks ###
         # generator_y maps X -> Y and generator_x maps Y -> X
@@ -98,8 +99,10 @@ class GAN(pl.LightningModule) :
         self.g_x = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
 
         # One discriminator to identify real DA+ images, another for DA- images
-        self.d_y = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters, n_layers=3, in_shape=self.image_size)
-        self.d_x = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters, n_layers=3, in_shape=self.image_size)
+        self.d_y = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters,
+                             n_layers=self.cnn_layers, in_shape=self.image_size)
+        self.d_x = CNNnLayer(in_channels=1, out_channels=1, init_features=self.n_filters,
+                             n_layers=self.cnn_layers, in_shape=self.image_size)
         ### ------------------- ###
 
         # Put networks on GPUs
@@ -135,7 +138,8 @@ class GAN(pl.LightningModule) :
         """
         # Get train and test data sets
         # Import CSV containing DA labels
-        y_df, n_df = load_image_data_frame(hparams.csv_path)
+        X_img, Y_img = hparams.img_domain[0], hparams.img_domain[1]
+        y_df, n_df = load_image_data_frame(hparams.csv_path, X_img, Y_img)
 
         # Create train and test sets for each DA+ and DA- imgs
         files = load_img_names(hparams.img_dir,
@@ -365,13 +369,13 @@ class GAN(pl.LightningModule) :
             # Generate some fake images to plot
             if self.dimension == 2 :
                 images = [    x[0, self.image_size[0] // 2, :, :].cpu(),
-                              y[0, self.image_size[0] // 2, :, :].cpu(),
                           gen_x[0, self.image_size[0] // 2, :, :].cpu(),
+                              y[0, self.image_size[0] // 2, :, :].cpu(),
                           gen_y[0, self.image_size[0] // 2, :, :].cpu()]
             else :
                 images = [    x[0, 0, self.image_size[0] // 2, :, :].cpu(),
-                              y[0, 0, self.image_size[0] // 2, :, :].cpu(),
                           gen_x[0, 0, self.image_size[0] // 2, :, :].cpu(),
+                              y[0, 0, self.image_size[0] // 2, :, :].cpu(),
                           gen_y[0, 0, self.image_size[0] // 2, :, :].cpu()]
 
             # Plot the image
@@ -420,10 +424,6 @@ class GAN(pl.LightningModule) :
                                  self.d_y.parameters()), lr=lr, betas=(b1, b2),
                                  weight_decay=self.hparams.weight_decay)
 
-        # Decay generator learning rate by factor every milestone[i] epochs
-        # scheduler_g = torch.optim.lr_scheduler.MultiStepLR(opt_g, milestones=[10, 11, 12, 13, 14, 15], gamma=0.5)
-        # scheduler_d = torch.optim.lr_scheduler.MultiStepLR(opt_d, milestones=[10, 11, 12, 13, 14, 15], gamma=0.5)
-
         scheduler_g = {# This scheduler will reduce lr if it plateaus for 2 epochs
                        'scheduler': ReduceLROnPlateau(opt_g, 'min', patience=2,
                                                       verbose=True, factor=0.5),
@@ -443,15 +443,23 @@ class GAN(pl.LightningModule) :
 
 def main(hparams):
     # ------------------------
-    # 1 INIT LIGHTNING MODEL
+    # 1 INIT LIGHTNING MODEL (possibly from checkpoint)
     # ------------------------
-    model = GAN(hparams)
+    print("------------------------------")
+    if hparams.checkpoint == "None" or hparams.checkpoint is None :
+        print("Starting training from scratch")
+        model = GAN(hparams=hparams)
+    else :
+        print("Starting training from checkpoint: ", hparams.checkpoint)
+        model = GAN.load_from_checkpoint(hparams.checkpoint, hparams=hparams)
+    print("------------------------------")
 
     # ------------------------
-    # 2 INIT TRAINER
+    # 2 INIT LOGGER -  Custom logger defined in loggers.py
     # ------------------------
-    # Custom logger defined in loggers.py
-    logger = TensorBoardCustom(hparams.log_dir, name="8_256_256px/strong_weak")
+    log_name = str(hparams.image_size)[1 : -1].replace(", ", "_") +"px/"+ "-".join(hparams.img_domain)
+    print(log_name)
+    logger = TensorBoardCustom(hparams.log_dir, name=log_name)
 
     # ------------------------
     # 3 INIT CHECKPOINTING

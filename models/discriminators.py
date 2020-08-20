@@ -28,7 +28,6 @@ def get_seq_out_shape(network, in_shape=[8, 256, 256], in_channels=1) :
     X = torch.randn(*in_shape)
     with torch.no_grad() :
         for layer in network :
-            print(X.shape)
             X = layer(X)
 
     # out_shape = network(X).shape
@@ -160,25 +159,28 @@ class CNNnLayer(nn.Module) :
         super(CNNnLayer, self).__init__()
 
         # Parameters for convolutional layers
-        ks = 4             # Kernel size
+        ks = 3             # Kernel size
         pads = 1           # Padding size
-        s = [2, 2, 2]      # Convolution stride
+        s = [1, 1, 1]      # Convolution stride
         normfunc = nn.BatchNorm3d
-
+        lrelu = nn.LeakyReLU(0.2)
+        pool = nn.MaxPool3d(2, 2)
 
         # Create first convolutional layer
         net_list = [nn.Conv3d(in_channels=in_channels, out_channels=init_features,
-                               kernel_size=ks, stride=s, padding=pads),
-                    nn.LeakyReLU(0.2, True)]
+                               kernel_size=5, stride=s, padding=2),
+                    normfunc(init_features), lrelu, pool]
 
         # Add middle layers
         for i in range(1, n_layers) :
+            if i == n_layers - 1 :          # Middle pooling layers are max pool
+                pool = nn.AvgPool3d(2, 2)   # Last pooling layer is avg pool
+
             in_ch = min(init_features * (2 ** (i - 1)), 512)
             out_ch = min(init_features * (2 ** i), 512)
             net_list += [nn.Conv3d(in_channels=in_ch, out_channels=out_ch,
                                    kernel_size=ks, stride=s, padding=pads),
-                         normfunc(out_ch, affine=False),
-                         nn.LeakyReLU(0.2, True)]
+                         normfunc(out_ch), lrelu, pool]
 
         self.net = nn.Sequential(*net_list)
 

@@ -18,15 +18,6 @@ class TensorBoardCustom(TensorBoardLogger):
         self.save_hparams = save_hparams
 
 
-    # @rank_zero_only
-    # def log_hyperparams(self, params):
-    #     # Bypass this as it does not currently work
-    #     if self.save_hparams :
-    #         return
-    #     else :
-    #         return
-
-
     @rank_zero_only
     def log_metrics(self, metrics, step):
         # metrics is a dictionary of metric names and values
@@ -57,7 +48,7 @@ class TensorBoardCustom(TensorBoardLogger):
         """ Creates a matplotlib image out of a 4D tensor or list of
         2D tensors:
         X.shape == (N, 1, D, H, W) or
-        X       == [x_real, y_real, x_fake, y_fake] """
+        X       == [x_real, x_fake, y_real, y_fake] """
         cm = ['viridis', "Greys"]
 
         if isinstance(X, list) :
@@ -65,7 +56,7 @@ class TensorBoardCustom(TensorBoardLogger):
             N = len(X)
             if N == 4 :
                 # Expect it to have a particular format
-                titles = ["DA+ Real", "DA- Real", "DA+ Fake", "DA- Fake"]
+                titles = ["DA+ Real", "DA+ Fake", "DA- Real", "DA- Fake"]
             else :
                 titles = np.arange(0, N, 1).astype(str)
             fig, ax = plt.subplots(nrows=1, ncols=N, figsize=[6*N, 6])
