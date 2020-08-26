@@ -7,7 +7,7 @@
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
 #SBATCH --gres=gpu:1
-#SBATCH --output=strong_to_none.out
+#SBATCH --output=strong_to_weakORnone.out
 #SBATCH --ntasks-per-node=1
 
 
@@ -26,7 +26,6 @@ path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
 csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
 img_path="/cluster/projects/radiomics/Temp/colin/isotropic_npy/images"
 log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
-checkpoint_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN/8_256_256px/2-1/version_0/checkpoints/epoch=6.ckpt"
 
 ### EDIT BELOW ###
 # Hyperparameters for training the model
@@ -52,7 +51,6 @@ python $path \
 --n_filters $num_filters \
 --image_size 8 256 256 \
 --img_domain_x 2 \
---img_domain_y 0 \
+--img_domain_y 1 0 \
 --cnn_layers 3
-# --checkpoint $checkpoint_path
 echo 'Python script finished.'

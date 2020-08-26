@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 2-00:00:00
-#SBATCH --mem-per-cpu=10G
+#SBATCH --mem=20G
 #SBATCH -J ArtifactNet
 #SBATCH -c 5
 #SBATCH -N 1
@@ -31,7 +31,7 @@ log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
 # Hyperparameters for training the model
 epochs=50                                # Number of epochs for training
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=1                             # Batch size for trainer
+batch_size=3                             # Batch size for trainer
 aug_factor=10                            # Number of times to augment each image
 num_gpus=1                               # Number of GPUs to use for training
 num_cpus=5                               # Number of workers for dataloaders
@@ -50,6 +50,7 @@ python $path \
 --n_cpus $num_cpus \
 --n_filters $num_filters \
 --image_size 8 256 256 \
---img_domain 2 1 \
---cnn_layers 4
+--img_domain_x 2 \
+--img_domain_y 1 \
+--cnn_layers 3
 echo 'Python script finished.'

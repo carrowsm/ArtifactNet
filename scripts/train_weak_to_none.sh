@@ -51,6 +51,7 @@ python $path \
 --n_cpus $num_cpus \
 --n_filters $num_filters \
 --image_size 8 256 256 \
---img_domain 1 0 \
+--img_domain_x 1 \
+--img_domain_y 0 \
 --checkpoint $checkpoint_path
 echo 'Python script finished.'
