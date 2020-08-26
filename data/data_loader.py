@@ -27,7 +27,7 @@ def load_image_data_frame(path, img_X, img_Y, label_col="has_artifact") :
                     'has_artifact'.
     Returns :
     ---------
-    One list for each image domain with the z-index of the DA slice for each patient. 
+    One list for each image domain with the z-index of the DA slice for each patient.
     """
     df = pd.read_csv(path,
                      usecols=["patient_id", label_col, "DA_z"],
@@ -35,8 +35,11 @@ def load_image_data_frame(path, img_X, img_Y, label_col="has_artifact") :
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
-    X_df = df[df[label_col] == img_X]  # Patients in domain X (DA+)
-    Y_df = df[df[label_col] == img_Y]  # Patients in domain X (DA-)
+    X_df = df[df[label_col].isin(img_X)]  # Patients in domain X (DA+)
+    Y_df = df[df[label_col].isin(img_Y)]  # Patients in domain X (DA-)
+
+    print(X_df["has_artifact"])
+    print(Y_df["has_artifact"])
 
     return X_df["DA_z"], Y_df["DA_z"]
 
@@ -153,11 +156,10 @@ class UnpairedDataset(t_data.Dataset):
               a^3 aroud centre_pix.
             - If list, it should have len=3 and represent the (z, y, x) size to
               crop all images to.
-        transform : list
-            - A list containing the names of the random transforms to be applied.
-            - Accepted names are ["rotatate", "flip" ].
         file_type: str, (default: "nrrd")
             - The file type to load. Can be either "npy" or "nrrd" or "dicom".
+        aug_factor : int (default: 1)
+            The number of times to reuse each image, with transformations.
         dim : int
             The dimension of the output image. If 2, images will have shape
             If 2, the images will have shape(batch_size, z_size, y_size, x_size).
@@ -349,6 +351,141 @@ class UnpairedDataset(t_data.Dataset):
 
 
 
+
+
+
+
+class PairedTestset(t_data.Dataset):
+    """
+    Image dataset for ArtifactNet test images where we have pairs.
+
+    Parameters:
+    -----------
+        X_image_dir : str
+            The path to the directory containing the images from domain X. Each
+            file name should be unique and correspond to a paired image with the
+            same name in Y_image_dir. Each image should be centered around its DA
+            slice.
+        Y_image_dir : str
+            The path to the directory containing the images from domain Y.
+        image_size : int, list, None
+            The size of the image to use (same for both domains X and Y).
+            - If None, use the entire image.
+            - If int=a, each image will be cropped to form a cube of size a^3
+            aroud the central pixel of the image.
+            - If list, it should have len=3 and represent the (z, y, x) size to
+              crop all images to, around the centre.
+        file_type: str, (default: "nrrd")
+            - The file type to load. Can be either "npy" or "nrrd" or "dicom".
+        dim : int
+            The dimension of the output image. If 2, images will have shape
+            If 2, the images will have shape(batch_size, z_size, y_size, x_size).
+            If 3, the images will have shape
+            (batch_size, 1, z_size, y_size, x_size).
+
+    Attributes :
+    ------------
+
+    Methods :
+    ---------
+
+
+    """
+
+    def __init__(self,
+                 X_image_dir,
+                 Y_image_dir,
+                 file_type="nrrd",
+                 image_size=None,
+                 aug_factor=1,
+                 dim=3):
+
+        self.x_image_dir  = X_image_dir # Path to images in domain X
+        self.y_image_dir  = Y_image_dir # Path to images in domain Y
+        self.file_type    = file_type
+        self.image_size   = image_size
+        self.dim          = dim
+
+        # Get a list of all images
+        self.img_files = os.listdir(X_image_dir)
+
+        # Total number of images
+        self.dataset_length = len(self.img_files)
+
+        # Get the correct function to load the image type
+        self.load_img = self.get_img_loader()
+
+
+    def get_img_loader(self) :
+        if self.file_type == "npy" :
+            return np.load
+        elif self.file_type == "nrrd" :
+            return read_nrrd_image
+        elif self.file_type == "dicom" :
+            return read_dicom_image
+        else :
+            raise Exception(f"file_type {self.file_type} not accepted.")
+
+
+    def centre_crop(img) :
+        """ Crop an image arond its centre """
+        z, y, x    = np.array(img.shape) // 2   # Centre of image
+        zs, ys, xs = np.array(self.image_size) // 2
+
+        if self.image_size[0] == 1 :
+            return img[z, y-ys : y+ys, x-xs : x+xs]
+        else :
+            return img[z-zs : z+zs, y-ys : y+ys, x-xs : x+xs]
+
+    def transform(X) :
+        X = torch.tensor(X, dtype=torch.float32)
+
+        # Apply intensity windowing and scaling
+        min_val = -1000.0
+        max_val =  1000.0
+        X = torch.clamp(X, min=min_val, max=max_val)# Make range (-1000, 1000)
+        X = X / 1000.0                              # Make range (-1, 1)
+        return X
+
+
+    def __getitem__(self, index) :
+        # Get the name of the image file at index
+        file_name = self.img_files[index]
+
+        # Load the image from each domain
+        X = self.load_img(os.path.join(self.x_image_dir), file_name)
+        Y = self.load_img(os.path.join(self.y_image_dir), file_name)
+
+        # Make datatype ints (not unsigned ints)
+        X, Y = X.astype(np.int16), Y.astype(np.int16)
+
+        # Transform the image (augmentation)
+        X = self.transform(X)
+        Y = self.transform(Y)
+
+        # Crop the image
+        X = self.centre_crop(X)
+        Y = self.centre_crop(Y)
+
+        # The Pytorch model takes a tensor of shape (batch_size, in_Channels, depth, height, width)
+        # or if the input image and model is 2D :   (batch_size, depth, height, width)
+        # Reshape the arrays to add another dimension
+        if self.dim == 2 :
+            X = X.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+            Y = Y.reshape(self.image_size[0], self.image_size[1], self.image_size[2])
+        else :
+            X = X.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+            Y = Y.reshape(1, self.image_size[0], self.image_size[1], self.image_size[2])
+
+        return X, Y
+
+
+
+
+
+
+
+
 class PairedDataset(t_data.Dataset):
     """
     Image dataset for ArtifactNet artifact removal GAN.
@@ -449,65 +586,3 @@ class PairedDataset(t_data.Dataset):
 
     def __len__(self):
         return self.dataset_length
-
-
-
-
-
-
-
-if __name__ == '__main__':
-    ### Unit testing ###
-    import matplotlib as mpl
-    mpl.use("Qt5Agg")
-    import matplotlib.pyplot as plt
-
-    def plt_imgs(X, Y, fname="") :
-        fig, ax = plt.subplots(ncols=2, nrows=1)
-        ax[0].imshow(x[x.shape[0]//2, :, :])
-        ax[1].imshow(y[x.shape[0]//2, :, :])
-        ax[0].set_title("X")
-        ax[1].set_title("Y")
-        plt.savefig(fname)
-
-
-    # Import CSV containing DA labels
-    csv_path = "/cluster/home/carrowsm/data/radcure_DA_labels.csv"
-    dir = "/cluster/projects/radiomics/Temp/RADCURE-npy/img"
-    y_df, n_df = load_image_data_frame(csv_path)
-
-
-    # Create train and test sets for each DA+ and DA- imgs
-    files = load_img_names(dir, y_da_df=y_df, n_da_df=n_df,
-                           f_type="npy", suffix="_img",
-                           data_augmentation_factor=1,
-                           test_size=0.25)
-
-    y_train, n_train, y_test, n_test = files
-
-    """
-    y_train is a matrix with len N and two columns:
-    y_train[:, 0] = z-index of DA in each patient
-    y_train[:, 1] = full path to each patient's image file
-    """
-
-
-    print(y_train.shape, n_train.shape)
-    print(y_train[:, 0].shape)
-
-
-    # Test data loader
-    dataset = UnpairedDataset(y_train[ :, 1],
-                              n_train[ :, 1],
-                              file_type="npy",
-                              X_image_centre=y_train[:, 0],
-                              Y_image_centre=n_train[:, 0],
-                              image_size=[50, 500, 500],
-                              transform=None)
-    # Get a test image set
-    x, y = dataset[2]
-
-    print(x.shape, y.shape)
-
-    # Save the image
-    plt_imgs(x, y, fname="1.png")

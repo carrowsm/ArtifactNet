@@ -138,7 +138,7 @@ class GAN(pl.LightningModule) :
         """
         # Get train and test data sets
         # Import CSV containing DA labels
-        X_img, Y_img = hparams.img_domain[0], hparams.img_domain[1]
+        X_img, Y_img = hparams.img_domain_x, hparams.img_domain_y
         y_df, n_df = load_image_data_frame(hparams.csv_path, X_img, Y_img)
 
         # Create train and test sets for each DA+ and DA- imgs
@@ -366,17 +366,16 @@ class GAN(pl.LightningModule) :
 
         ### Log some sample images once per epoch ###
         if batch_idx == 0 :
-            # Generate some fake images to plot
             if self.dimension == 2 :
                 images = [    x[0, self.image_size[0] // 2, :, :].cpu(),
-                          gen_x[0, self.image_size[0] // 2, :, :].cpu(),
+                          gen_y[0, self.image_size[0] // 2, :, :].cpu(),
                               y[0, self.image_size[0] // 2, :, :].cpu(),
-                          gen_y[0, self.image_size[0] // 2, :, :].cpu()]
+                          gen_x[0, self.image_size[0] // 2, :, :].cpu()]
             else :
                 images = [    x[0, 0, self.image_size[0] // 2, :, :].cpu(),
-                          gen_x[0, 0, self.image_size[0] // 2, :, :].cpu(),
+                          gen_y[0, 0, self.image_size[0] // 2, :, :].cpu(),
                               y[0, 0, self.image_size[0] // 2, :, :].cpu(),
-                          gen_y[0, 0, self.image_size[0] // 2, :, :].cpu()]
+                          gen_x[0, 0, self.image_size[0] // 2, :, :].cpu()]
 
             # Plot the image
             self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}',
@@ -457,7 +456,9 @@ def main(hparams):
     # ------------------------
     # 2 INIT LOGGER -  Custom logger defined in loggers.py
     # ------------------------
-    log_name = str(hparams.image_size)[1 : -1].replace(", ", "_") +"px/"+ "-".join(hparams.img_domain)
+    log_name = str(hparams.image_size)[1 : -1].replace(", ", "_") +\
+                    "px/"+ "_".join(hparams.img_domain_x) + "-" +\
+                    "_".join(hparams.img_domain_y)
     print(log_name)
     logger = TensorBoardCustom(hparams.log_dir, name=log_name)
 
@@ -476,14 +477,14 @@ def main(hparams):
     # Main PLT training module
     trainer = pl.Trainer(logger=logger,
                          # accumulate_grad_batches=10,
-                         gradient_clip_val=0.1,
+                         # gradient_clip_val=0.1,
                          val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
                          num_nodes=1,
                          distributed_backend="ddp",
                          benchmark=True,
-                         val_check_interval=0.1    # Check validation 10 times per epoch
+                         val_check_interval=0.2    # Check validation 5 times per epoch
                          )
 
     # ------------------------

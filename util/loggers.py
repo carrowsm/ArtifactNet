@@ -48,15 +48,13 @@ class TensorBoardCustom(TensorBoardLogger):
         """ Creates a matplotlib image out of a 4D tensor or list of
         2D tensors:
         X.shape == (N, 1, D, H, W) or
-        X       == [x_real, x_fake, y_real, y_fake] """
+        X       == [x_real, y_fake, y_real, x_fake] """
         cm = ['viridis', "Greys"]
 
         if isinstance(X, list) :
-            # X is a list of 2D tensors
-            N = len(X)
-            if N == 4 :
-                # Expect it to have a particular format
-                titles = ["DA+ Real", "DA+ Fake", "DA- Real", "DA- Fake"]
+            N = len(X)   # X is a list of 2D tensors
+            if N == 4 :  # Expect it to have a particular format
+                titles = ["DA+ Real", "DA- Fake", "DA- Real", "DA+ Fake"]
             else :
                 titles = np.arange(0, N, 1).astype(str)
             fig, ax = plt.subplots(nrows=1, ncols=N, figsize=[6*N, 6])

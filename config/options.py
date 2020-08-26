@@ -40,13 +40,16 @@ parser.add_argument("--architecture", type=str, default="cycleGAN_3D",
 parser.add_argument("--n_filters", type=int, default=32,
                     help="Number of input filters to use in generator and discriminator.")
 parser.add_argument("--cnn_layers", type=int, default=3,
-                    help="Number of convolutional layers for the discriminator".)
+                    help="Number of convolutional layers for the discriminator.")
 parser.add_argument("--image_size", type=int, nargs="*", default=[16,256,256],
                     help="The size of the image in pixels. If a list of length 3, the image will \
 be 3D with shape [z, y, x]. If a list of length 2, the image with be 2D with shape [y, x].")
-parser.add_argument("--img_domain", type=str, nargs="*", default=[2,1],
-                    help="Two arguments representing the image domain to translate from and to. \
-2 is 'strong', 1 is 'weak', 0 is no-DA.")
+parser.add_argument("--img_domain_x", type=str, nargs="*", default=[2],
+                    help="One or two arguments representing the images to use for domain X. If \
+two arguments are given, the union of the groups will be used. 2 is 'strong', 1 is 'weak', 0 is no-DA.")
+parser.add_argument("--img_domain_y", type=str, nargs="*", default=[1],
+                    help="One or two arguments representing the images to use for domain Y. If \
+two arguments are given, the union of the groups will be used.")
 parser.add_argument("--checkpoint", type=str, default="None",
                     help="The path to a checkpoint file. If 'None', training will start from scratch.")
 
