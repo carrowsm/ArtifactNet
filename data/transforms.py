@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.ndimage
+import torch
+import SimpleITK as sitk
 
 
 def affine_transform(a, angle=15.0, pixels=(20, 20), fill_mode='nearest') :
@@ -37,6 +39,82 @@ def affine_transform(a, angle=15.0, pixels=(20, 20), fill_mode='nearest') :
     a = scipy.ndimage.shift(a, [0, y, x], mode=fill_mode)
 
     return a
+
+
+class AffineTransform:
+    """Apply an affine transform to a sitk image
+    """
+
+    def __init__(self, max_angle: float = 20.0, max_pixels=[20, 20],
+                 fill_value: float = -1050.0):
+        """Initialize the transform class.
+
+        Parameters
+        ----------
+        max_angle
+            The maximum absolute angle by which to rotate the image from its
+            original position. The actual rotation angle is uniformly randomly
+            chosen from the range [-max_angle, max_angle].
+        max_pixels
+            The number of pixels by which to translate the image in the x and y
+            plane. The actualy translation will be randomly selected from the
+            range [-max_pixels[0], max_pixels[0]]; [-max_pixels[1], max_pixels[1]]
+            in the x and y axes respectively.
+        fill_value
+            The pixel value to fill in the rotations/translations.
+        """
+        self.max_angle = max_angle
+        self.max_pixels = max_pixels
+        self.fill_value = fill_value
+
+
+    def __call__(self, X: sitk.Image) -> sitk.Image :
+        angle = -self.max_angle + 2 * self.max_angle * torch.rand(1).item()
+        rotation_centre = np.array(X.GetSize()) / 2
+        rotation_centre = X.TransformContinuousIndexToPhysicalPoint(rotation_centre)
+
+        max_pixel = torch.Tensor([self.max_pixels[0], self.max_pixels[1]])
+        pixel = (-max_pixel + 2 * max_pixel * torch.rand(2)).numpy()
+
+        rotation = sitk.Euler3DTransform(
+            rotation_centre,
+            0,      # the angle of rotation around the x-axis, in radians -> coronal rotation
+            0,      # the angle of rotation around the y-axis, in radians -> saggittal rotation
+            angle,  # the angle of rotation around the z-axis, in radians -> axial rotation
+            (pixel[0], pixel[1], 0.0)  # translation
+        )
+        return sitk.Resample(X, X, rotation, sitk.sitkLinear, self.fill_value)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(max_angle={self.max_angle}, fill_value={self.fill_value})"
+
+
+class ToTensor:
+    """Convert a SimpleITK image to torch.Tensor."""
+    def __call__(self, image: sitk.Image) -> torch.Tensor:
+        """Apply the transform.
+
+        Parameters
+        ----------
+        image
+            Image to convert to tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            The converted tensor.
+        """
+        array = sitk.GetArrayFromImage(image)
+        X = torch.from_numpy(array).unsqueeze(0).float()
+
+        X = torch.clamp(X, min=-1000.0, max=1000.0) / 1000.0 # Make range (-1, 1)
+        return X
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+
+
+
 
 if __name__ == '__main__':
     import os

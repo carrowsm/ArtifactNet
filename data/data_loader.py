@@ -13,8 +13,8 @@ import torch
 from torch.utils.data import Dataset
 import torchvision
 
-from data.sitk_processing import read_dicom_image, resample_image, read_nrrd_image
-from data.augmentations import affine_transform
+from data.preprocessing import read_dicom_image, resample_image, read_nrrd_image
+from data.transforms import affine_transform
 
 
 
@@ -128,9 +128,10 @@ class BaseDataset(Dataset):
 
         # Get the number of images in each domain
         self.x_size, self.y_size = len(X_df), len(Y_df)
+        self.x_ids, self.y_ids = self.X_df.index, self.Y_df.index
 
         # Create a cache if needed. Check if cache already exists
-        sample_path = os.path.join(self.cache_dir, X_df.index[0] + ".nrrd")
+        sample_path = os.path.join(self.cache_dir, self.x_ids[0] + ".nrrd")
         if os.path.exists(sample_path) :
             # The sample file exists. Now check that the size is right
             sample_file = sitk.GetArrayFromImage(read_nrrd_image(sample_path))
@@ -170,9 +171,9 @@ class BaseDataset(Dataset):
         da_idx = int(self.full_df.at[patient_id, self.da_slice_col])
 
         # Resample image and DA slice to [1,1,1] voxel spacing
-        da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx]) # Physical coords of DA
+        da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
         image = resample_image(image, new_spacing=[1, 1, 1])
-        da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # Index of DA in isotropic spacing
+        da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
 
         ### Cropping ###
         # Get the centre of the head in the DA slice
@@ -230,8 +231,8 @@ class UnpairedDataset(BaseDataset):
         # Randomize index for images in Y domain to avoid pairs
         x_index = index
         y_index = np.random.randint(0, self.y_size - 1)
-        x_patient_id = self.X_df.index[x_index]
-        y_patient_id = self.Y_df.index[y_index]
+        x_patient_id = self.x_ids[x_index]
+        y_patient_id = self.y_ids[y_index]
 
         # Load the sitk image from each class
         X = self.load_img(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
@@ -239,12 +240,51 @@ class UnpairedDataset(BaseDataset):
 
         # Apply random transforms
         if self.transform is not None:
-            image = self.transform(image)
+            X = self.transform(X)
+            Y = self.transform(Y)
+
+        if self.dim == 2 : # Use the channels as third dimension
+            X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+            Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+
+        return X, Y
 
 
+    class PairedDataset(object):
+        """Dataloader for a PairedDataset."""
+        def __init__(self, **kwargs) :
+            super().__init__(**kwargs)
+            # Check that the two dataframes are the same length
+            if self.x_size != self.y_size :
+                raise ValueError("Paired datasets must have the same size.")
 
+        def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor] :
+            """ Get a the image at index from domain X and get an accompanying
+            random image from domain Y. Assume the images are preprocessed (sized)
+            and cached.
 
+            Parameters
+            ----------
+            index (int)
+                The index of the image in both domains.
+            """
+            x_patient_id = self.x_ids[index]
+            y_patient_id = self.y_ids[index]
 
+            # Load the sitk image from each class
+            X = self.load_img(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
+            Y = self.load_img(os.path.join(self.cache_dir, f"{y_patient_id}.nrrd"))
+
+            # Apply random transforms
+            if self.transform is not None:
+                X = self.transform(X)
+                Y = self.transform(Y)
+
+            if self.dim == 2 : # Use the channels as third dimension
+                X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+                Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+
+            return X, Y
 
 
 
