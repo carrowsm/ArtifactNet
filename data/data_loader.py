@@ -191,7 +191,7 @@ class BaseDataset(Dataset):
         ### --------- ###
 
         # Save the image
-        sitk.WriteImage(image, os.path.join(self.cache_path, f"{patient_id}.nrrd))
+        sitk.WriteImage(image, os.path.join(self.cache_path, f"{patient_id}.nrrd"))
 
 
     def __getitem__(self, index) :
@@ -235,8 +235,8 @@ class UnpairedDataset(BaseDataset):
         y_patient_id = self.y_ids[y_index]
 
         # Load the sitk image from each class
-        X = self.load_img(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
-        Y = self.load_img(os.path.join(self.cache_dir, f"{y_patient_id}.nrrd"))
+        X = sitk.ReadImage(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
+        Y = sitk.ReadImage(os.path.join(self.cache_dir, f"{y_patient_id}.nrrd"))
 
         # Apply random transforms
         if self.transform is not None:
@@ -250,41 +250,41 @@ class UnpairedDataset(BaseDataset):
         return X, Y
 
 
-    class PairedDataset(BaseDataset):
-        """Dataloader for a PairedDataset."""
-        def __init__(self, *args, **kwargs) :
-            super().__init__(*args, **kwargs)
-            # Check that the two dataframes are the same length
-            if self.x_size != self.y_size :
-                raise ValueError("Paired datasets must have the same size.")
+class PairedDataset(BaseDataset):
+    """Dataloader for a PairedDataset."""
+    def __init__(self, *args, **kwargs) :
+        super().__init__(*args, **kwargs)
+        # Check that the two dataframes are the same length
+        if self.x_size != self.y_size :
+            raise ValueError("Paired datasets must have the same size.")
 
-        def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor] :
-            """ Get a the image at index from domain X and get an accompanying
-            random image from domain Y. Assume the images are preprocessed (sized)
-            and cached.
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor] :
+        """ Get a the image at index from domain X and get an accompanying
+        random image from domain Y. Assume the images are preprocessed (sized)
+        and cached.
 
-            Parameters
-            ----------
-            index (int)
-                The index of the image in both domains.
-            """
-            x_patient_id = self.x_ids[index]
-            y_patient_id = self.y_ids[index]
+        Parameters
+        ----------
+        index (int)
+            The index of the image in both domains.
+        """
+        x_patient_id = self.x_ids[index]
+        y_patient_id = self.y_ids[index]
 
-            # Load the sitk image from each class
-            X = self.load_img(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
-            Y = self.load_img(os.path.join(self.cache_dir, f"{y_patient_id}.nrrd"))
+        # Load the sitk image from each class
+        X = sitk.ReadImage(os.path.join(self.cache_dir, f"{x_patient_id}.nrrd"))
+        Y = sitk.ReadImage(os.path.join(self.cache_dir, f"{y_patient_id}.nrrd"))
 
-            # Apply random transforms
-            if self.transform is not None:
-                X = self.transform(X)
-                Y = self.transform(Y)
+        # Apply random transforms
+        if self.transform is not None:
+            X = self.transform(X)
+            Y = self.transform(Y)
 
-            if self.dim == 2 : # Use the channels as third dimension
-                X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
-                Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+        if self.dim == 2 : # Use the channels as third dimension
+            X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+            Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
 
-            return X, Y
+        return X, Y
 
 
 
