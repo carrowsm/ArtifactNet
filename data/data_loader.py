@@ -250,10 +250,10 @@ class UnpairedDataset(BaseDataset):
         return X, Y
 
 
-    class PairedDataset(object):
+    class PairedDataset(BaseDataset):
         """Dataloader for a PairedDataset."""
-        def __init__(self, **kwargs) :
-            super().__init__(**kwargs)
+        def __init__(self, *args, **kwargs) :
+            super().__init__(*args, **kwargs)
             # Check that the two dataframes are the same length
             if self.x_size != self.y_size :
                 raise ValueError("Paired datasets must have the same size.")
