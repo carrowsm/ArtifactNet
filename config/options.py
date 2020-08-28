@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 ### EDIT THESE PATHS ###
 img_dir = "/cluster/home/carrowsm/data/Simulated_DA/"
 log_dir = "/cluster/home/carrowsm/logs/artifact_net/remove/"
+cache   = "/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/"
 ### ---------------- ###
 
 parser = ArgumentParser()
@@ -13,7 +14,7 @@ parser.add_argument("--csv_path", type=str, default="",
                     help="Path to the CSV containing all image DA statuses and DA locations")
 parser.add_argument("--img_dir", default=img_dir, type=str, help="Path to the input image data.")
 parser.add_argument("--log_dir", default=log_dir, type=str, help='Where to save results.')
-
+parser.add_argument("--cache_dir", default=cache, type=str, help="Where to cache images for training.")
 
 ### Hyperparams for model training ###
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")

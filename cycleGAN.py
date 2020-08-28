@@ -29,10 +29,10 @@ import pytorch_lightning as pl
 
 from config.options import get_args
 
-from data.data_loader import load_image_data_frame, load_img_names, UnpairedDataset
+from data.data_loader import load_image_data_frame, UnpairedDataset, PairedDataset
 
 from models.generators import UNet3D, ResNetK, UNet2D, UNet3D_3layer
-from models.discriminators import PatchGAN_3D, CNN_3D, PatchGAN_NLayer, CNNnLayer, CNN_2D, VGG2D
+from models.discriminators import CNN_3D, PatchGAN_NLayer, CNNnLayer
 from util.helper_functions import set_requires_grad
 from util.loggers import TensorBoardCustom
 
@@ -142,30 +142,15 @@ class GAN(pl.LightningModule) :
         y_df, n_df = load_image_data_frame(hparams.csv_path, X_img, Y_img)
 
         # Create train and test sets for each DA+ and DA- imgs
-        files = load_img_names(hparams.img_dir,
-                               y_da_df=y_df, n_da_df=n_df,
-                               f_type="npy", suffix="",
-                               data_augmentation_factor=hparams.augmentation_factor,
-                               test_size=0.25)  # Use 25% of train data for validation
-        self.y_train, self.n_train, self.y_valid, self.n_valid = files
-        """ y == DA+, n == DA-
-            y_train is a matrix with len N and two columns:
-            y_train[:, 0] = z-index of DA in each patient
-            y_train[:, 1] = full path to each patient's image file
-        """
+
         # Train data loader
-        trg_dataset = UnpairedDataset(self.y_train[ :, 1],           # Paths to DA+ images
-                                      self.n_train[ :, 1],           # Paths to DA- images
+        trg_dataset = UnpairedDataset(y_df, n_df
                                       file_type="npy",
-                                      # X_image_centre=self.y_train[:, 0], # DA slice index
-                                      # Y_image_centre=self.n_train[:, 0], # Mouth slice index
-                                      X_image_centre=None, # Imgs are preprocessed to be cropped
-                                      Y_image_centre=None, # around DA
+                                      img_dir=self.
                                       image_size=self.image_size,
                                       aug_factor=self.hparams.augmentation_factor,
                                       dim=self.dimension)
-        val_dataset = UnpairedDataset(self.y_valid[ :, 1],           # Paths to DA+ images
-                                      self.n_valid[ :, 1],           # Paths to DA- images
+        val_dataset = PairedDataset(y_df, n_df
                                       file_type="npy",
                                       X_image_centre=None, # Imgs are preprocessed to be cropped
                                       Y_image_centre=None, # around DA
