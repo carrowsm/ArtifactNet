@@ -117,16 +117,6 @@ def resample_image(image: sitk.Image,
 
 
 
-def read_nrrd_image(nrrd_file_path) :
-    image = sitk.ReadImage(nrrd_file_path)
-
-    # Resample the image
-    image = resample_image(image, new_spacing=[1,1,1])
-
-    # image = sitk.GetArrayFromImage(image)
-
-    return image
-
 
 
 def read_dicom_image(path) :
@@ -140,12 +130,6 @@ def read_dicom_image(path) :
     dicom_names = reader.GetGDCMSeriesFileNames(dicom_path)
     reader.SetFileNames(dicom_names)
     image = reader.Execute()
-
-    # Resize the image
-    # image = resample_image(image, new_spacing=[1,1,1])
-
-    # Comvert image to np array
-    # imageArray = sitk.GetArrayFromImage(resamp_img)
 
     return image
 

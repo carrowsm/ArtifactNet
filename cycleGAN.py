@@ -14,6 +14,7 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision
@@ -30,6 +31,7 @@ import pytorch_lightning as pl
 from config.options import get_args
 
 from data.data_loader import load_image_data_frame, UnpairedDataset, PairedDataset
+from data.transforms import AffineTransform, ToTensor, Normalize
 
 from models.generators import UNet3D, ResNetK, UNet2D, UNet3D_3layer
 from models.discriminators import CNN_3D, PatchGAN_NLayer, CNNnLayer
@@ -138,25 +140,39 @@ class GAN(pl.LightningModule) :
         """
         # Get train and test data sets
         # Import CSV containing DA labels
-        X_img, Y_img = hparams.img_domain_x, hparams.img_domain_y
-        y_df, n_df = load_image_data_frame(hparams.csv_path, X_img, Y_img)
+        X_img, Y_img = self.hparams.img_domain_x, self.hparams.img_domain_y
+        y_df, n_df = load_image_data_frame(self.hparams.csv_path, X_img, Y_img)
 
-        # Create train and test sets for each DA+ and DA- imgs
+        # Create train and validation sets for each DA+ and DA- imgs
+        ### Train-val split, if needed
+        val_x_path = "/cluster/home/carrowsm/ArtifactNet/datasets/reza_test_X.csv"
+        val_y_path = "/cluster/home/carrowsm/ArtifactNet/datasets/reza_test_Y.csv"
+        val_x_df = pd.read_csv(val_x_path, dtype=str).set_index("patient_id")
+        val_y_df = pd.read_csv(val_y_path, dtype=str).set_index("patient_id")
+
+        # Define sequence of transforms
+        trg_transform = torchvision.transforms.Compose([
+                    AffineTransform(max_angle=20.0, max_pixels=[20, 20]),
+                    Normalize(-1000.0, 1000.0),
+                    ToTensor()])
+        val_transform = torchvision.transforms.Compose([ ToTensor() ])
 
         # Train data loader
-        trg_dataset = UnpairedDataset(y_df, n_df
-                                      file_type="npy",
-                                      img_dir=self.
+        trg_dataset = UnpairedDataset(y_df, n_df,
+                                      image_dir=self.hparams.img_dir,
+                                      cache_dir=self.hparams.cache_dir,
+                                      file_type="DICOM",
                                       image_size=self.image_size,
-                                      aug_factor=self.hparams.augmentation_factor,
-                                      dim=self.dimension)
-        val_dataset = PairedDataset(y_df, n_df
-                                      file_type="npy",
-                                      X_image_centre=None, # Imgs are preprocessed to be cropped
-                                      Y_image_centre=None, # around DA
-                                      image_size=self.image_size,
-                                      aug_factor=1,        # Don't apply augmentations
-                                      dim=self.dimension)
+                                      dim=self.dimension,
+                                      transform=trg_transform,
+                                      num_workers=self.hparams.n_cpus)
+        val_dataset = PairedDataset(val_x_df, val_x_df,
+                                    image_dir=os.path.join(self.hparams.img_dir, "paired_test"),
+                                    cache_dir=self.hparams.cache_dir,
+                                    image_size=self.image_size,
+                                    dim=self.dimension,
+                                    transform=val_transform,
+                                    num_workers=self.hparams.n_cpus)
 
         self.trg_dataset = trg_dataset
         self.val_dataset = val_dataset

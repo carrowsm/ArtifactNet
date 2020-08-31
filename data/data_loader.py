@@ -1,49 +1,46 @@
 import os
 import sys
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Sequence
+from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.utils import shuffle
 from skimage.filters import threshold_otsu
 from scipy import ndimage
+import SimpleITK as sitk
 
 import torch
 from torch.utils.data import Dataset
 import torchvision
 
-from data.preprocessing import read_dicom_image, resample_image, read_nrrd_image
-from data.transforms import affine_transform
+from data.preprocessing import read_dicom_image, resample_image
+from data.transforms import AffineTransform
 
 
-
-def load_image_data_frame(path, img_X, img_Y, label_col="has_artifact") :
+def load_image_data_frame(path, img_X: Sequence[str], img_Y: Sequence[str],
+                          label_col="has_artifact") :
     """ Load data Frame containing the DA label and location of each patient
     Parameters :
     ------------
     path (str) :    Full path to the CSV containing the image IDs and corresponding
                     labels.
-    X_label (list) : The CSV label for images in domain X. These labels are in the
-                    column col_name in the CSV.
-    Y_label (list) : The CSV label for images in domain Y.
-    label_col (str): The CSV column name containing the image labels. Default is
+    img_X (list) :  The CSV label for images in domain X. Must be a list of labels
+                    as strings. The union of all labels in the list will be used.
+    img_Y (list) :  The CSV label for images in domain Y.
+    label_col (str):The CSV column name containing the image labels. Default is
                     'has_artifact'.
     Returns :
     ---------
     One DF for each image domain with the z-index of the DA slice for each patient.
     """
     df = pd.read_csv(path,
-                     usecols=["patient_id", label_col, "DA_z"],
+                     usecols=["patient_id", label_col, "DA_z", "a_slice"],
                      dtype=str, na_values=['nan', 'NaN', ''])
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
     X_df = df[df[label_col].isin(img_X)]  # Patients in domain X (DA+)
     Y_df = df[df[label_col].isin(img_Y)]  # Patients in domain X (DA-)
-
-    print(X_df["has_artifact"])
-    print(Y_df["has_artifact"])
 
     return X_df, Y_df
 
@@ -58,7 +55,7 @@ class BaseDataset(Dataset):
     """
     def __init__(self,
                  X_df: pd.DataFrame, Y_df: pd.DataFrame,
-                 img_dir: str,
+                 image_dir: str,
                  cache_dir: str,
                  file_type: str = "DICOM",
                  image_size=[8, 256, 256],
@@ -111,11 +108,10 @@ class BaseDataset(Dataset):
             The name of the column containing the z-index of the DA.
         """
         self.X_df, self.Y_df = X_df, Y_df
-        self.img_dir = img_dir
+        self.img_dir = image_dir
         self.cache_dir = cache_dir
         self.file_type = file_type
-        self.use_raw = use_raw
-        self.img_size = np.array(img_size)
+        self.img_size = np.array(image_size)
         self.dim = dim
         self.transform = transform
         self.num_workers = num_workers
@@ -123,32 +119,29 @@ class BaseDataset(Dataset):
         self.da_size_col = da_size_col
         self.da_slice_col = da_slice_col
 
-        # Get the correct function to load the raw image type
-        self.load_img = self.get_img_loader()
-
         # Get the number of images in each domain
         self.x_size, self.y_size = len(X_df), len(Y_df)
         self.x_ids, self.y_ids = self.X_df.index, self.Y_df.index
 
         # Create a cache if needed. Check if cache already exists
         sample_path = os.path.join(self.cache_dir, self.x_ids[0] + ".nrrd")
+        print("")
         if os.path.exists(sample_path) :
             # The sample file exists. Now check that the size is right
-            sample_file = sitk.GetArrayFromImage(read_nrrd_image(sample_path))
-            if np.array(sample_file.shape) != self.img_size :
+            sample_file = sitk.GetArrayFromImage(sitk.ReadImage(sample_path))
+            if (np.array(sample_file.shape) != self.img_size).any() :
                 # The images are not correctly cached. Process them again
                 self._prepare_data()
         else :
             # The images are not cached. Process them.
-            os.makedirs(self.cache_dir)
+            os.makedirs(self.cache_dir, exist_ok=True)
             self._prepare_data()
+        print("Data successfully cached\n")
 
 
     def _get_img_loader(self) :
-        if self.file_type == "npy" :
-            return np.load
-        elif self.file_type == "nrrd" :
-            return read_nrrd_image
+        if self.file_type == "nrrd" :
+            return sitk.ReadImage
         elif self.file_type == "DICOM" :
             return read_dicom_image
         else :
@@ -157,7 +150,11 @@ class BaseDataset(Dataset):
 
     def _prepare_data(self) :
         """Preprocess and cache the dataset."""
+        # Get the correct function to load the raw image type
+        self.load_img = self._get_img_loader()
         self.full_df = pd.concat([self.X_df, self.Y_df])
+
+        print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
         Parallel(n_jobs=self.num_workers)(
             delayed(self._preprocess_image)(patient_id)
             for patient_id in self.full_df.index)
@@ -172,7 +169,7 @@ class BaseDataset(Dataset):
 
         # Resample image and DA slice to [1,1,1] voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
-        image = resample_image(image, new_spacing=[1, 1, 1])
+        image = resample_image(image, [1.0, 1.0, 1.0])
         da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
 
         ### Cropping ###
@@ -183,15 +180,16 @@ class BaseDataset(Dataset):
         com  = ndimage.measurements.center_of_mass(slice)
         y, x = int(com[0]) - 25, int(com[1])
         crop_centre = np.array([x, y, da_z])
+        crop_size   = self.img_size[::-1] # Reverse array to comply with sitk indexing
 
         # Crop to required size around this point
-        _min = np.floor(crop_centre - self.img_size / 2).astype(np.int64)
-        _max = np.floor(crop_centre + self.img_size / 2).astype(np.int64)
+        _min = np.floor(crop_centre - crop_size / 2).astype(np.int64)
+        _max = np.floor(crop_centre + crop_size / 2).astype(np.int64)
         image = image[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]]
         ### --------- ###
 
         # Save the image
-        sitk.WriteImage(image, os.path.join(self.cache_path, f"{patient_id}.nrrd"))
+        sitk.WriteImage(image, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
 
 
     def __getitem__(self, index) :

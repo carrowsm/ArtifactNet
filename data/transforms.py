@@ -45,8 +45,10 @@ class AffineTransform:
     """Apply an affine transform to a sitk image
     """
 
-    def __init__(self, max_angle: float = 20.0, max_pixels=[20, 20],
-                 fill_value: float = -1050.0):
+    def __init__(self,
+                 max_angle: float = 20.0,
+                 max_pixels=[20, 20],
+                 fill_value: float = -1050.0) :
         """Initialize the transform class.
 
         Parameters
@@ -107,14 +109,22 @@ class ToTensor:
         array = sitk.GetArrayFromImage(image)
         X = torch.from_numpy(array).unsqueeze(0).float()
 
-        X = torch.clamp(X, min=-1000.0, max=1000.0) / 1000.0 # Make range (-1, 1)
         return X
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
 
-
+class Normalize :
+    """ Normalize the pixel intensities in the image"""
+    def __init__(self, _min: float = -1000.0, _max: float = 1000.0) :
+        self.min = min
+        self.max = max
+    def __call__(self, image:sitk.Image) -> torch.Tensor :
+        f = sitk.ClampImageFilter()
+        f.SetLowerBound(_min)
+        f.SetUpperBound(_max)
+        return (f.Execute(image)) / 2000.0
 
 if __name__ == '__main__':
     import os

@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 ### EDIT THESE PATHS ###
 img_dir = "/cluster/home/carrowsm/data/Simulated_DA/"
 log_dir = "/cluster/home/carrowsm/logs/artifact_net/remove/"
-cache   = "/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/"
+cache   = "/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/unpaired_train"
 ### ---------------- ###
 
 parser = ArgumentParser()
