@@ -1,7 +1,7 @@
 import io
 import os
 import numpy as np
-from typing import Callable, Optional, Tuple, Union, Sequence
+from typing import Callable, Optional, Union, Sequence
 
 import SimpleITK as sitk
 from skimage.transform import resize

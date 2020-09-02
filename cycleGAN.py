@@ -96,7 +96,7 @@ class GAN(pl.LightningModule) :
         self.cnn_layers = hparams.cnn_layers
 
         ### Initialize Networks ###
-        # generator_y maps X -> Y and generator_x maps Y -> X
+        # g_y maps X -> Y and generator_x maps Y -> X
         self.g_y = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
         self.g_x = UNet3D_3layer(in_channels=1, out_channels=1, init_features=self.n_filters)
 
@@ -160,15 +160,15 @@ class GAN(pl.LightningModule) :
         # Train data loader
         trg_dataset = UnpairedDataset(y_df, n_df,
                                       image_dir=self.hparams.img_dir,
-                                      cache_dir=self.hparams.cache_dir,
+                                      cache_dir=os.path.join(self.hparams.cache_dir, "unpaired_train"),
                                       file_type="DICOM",
                                       image_size=self.image_size,
                                       dim=self.dimension,
                                       transform=trg_transform,
                                       num_workers=self.hparams.n_cpus)
         val_dataset = PairedDataset(val_x_df, val_x_df,
-                                    image_dir=os.path.join(self.hparams.img_dir, "paired_test"),
-                                    cache_dir=self.hparams.cache_dir,
+                                    image_dir=os.path.join(self.hparams.cache_dir, "paired_test"),
+                                    cache_dir=os.path.join(self.hparams.cache_dir, "paired_test"),
                                     image_size=self.image_size,
                                     dim=self.dimension,
                                     transform=val_transform,
@@ -202,9 +202,9 @@ class GAN(pl.LightningModule) :
     @pl.data_loader
     def val_dataloader(self) :
         data_loader = DataLoader(self.val_dataset,
-                                 batch_size=self.hparams.batch_size,
+                                 batch_size=1,
                                  shuffle=False,
-                                 num_workers=self.hparams.n_cpus - 1,
+                                 num_workers=1,
                                  drop_last=True,
                                  pin_memory=True)
         return data_loader
@@ -298,12 +298,10 @@ class GAN(pl.LightningModule) :
             d_x_real = self.d_x(x).view(-1)
 
             # Compute loss for each discriminator
-            # ----------------------- #
             loss_Dy = self.adv_loss(d_y_fake, zeros) + self.adv_loss(d_y_real, ones)
-            # ----------------------- #
             loss_Dx = self.adv_loss(d_x_fake, zeros) + self.adv_loss(d_x_real, ones)
-
             D_loss = (loss_Dy + loss_Dx) / 2
+            # ----------------------- #
 
             # Save the discriminator loss in a dictionary
             tqdm_dict = {'d_loss': D_loss}

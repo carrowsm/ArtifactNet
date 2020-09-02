@@ -2,6 +2,9 @@ import numpy as np
 import scipy.ndimage
 import torch
 import SimpleITK as sitk
+from typing import Tuple
+
+
 
 
 def affine_transform(a, angle=15.0, pixels=(20, 20), fill_mode='nearest') :
@@ -41,6 +44,9 @@ def affine_transform(a, angle=15.0, pixels=(20, 20), fill_mode='nearest') :
     return a
 
 
+
+
+
 class AffineTransform:
     """Apply an affine transform to a sitk image
     """
@@ -65,18 +71,30 @@ class AffineTransform:
         fill_value
             The pixel value to fill in the rotations/translations.
         """
-        self.max_angle = max_angle
+        self.max_angle = max_angle * (np.pi / 180.0) # Convert to radians
         self.max_pixels = max_pixels
         self.fill_value = fill_value
 
+    def __call__(self, image_xy : Tuple[sitk.Image, sitk.Image]) -> Tuple[sitk.Image, sitk.Image] :
+        """Apply the transform.
 
-    def __call__(self, X: sitk.Image) -> sitk.Image :
+        Parameters
+        ----------
+        image_xy
+            A tuple containing the image from domain X and Y to transform
+
+        Returns
+        -------
+        Tuple[sitk.Image, sitk.Image]
+            The transformed images from domain X and Y.
+        """
+        image_x, image_y = image_xy
         angle = -self.max_angle + 2 * self.max_angle * torch.rand(1).item()
-        rotation_centre = np.array(X.GetSize()) / 2
-        rotation_centre = X.TransformContinuousIndexToPhysicalPoint(rotation_centre)
+        rotation_centre = np.array(image_x.GetSize()) / 2
+        rotation_centre = image_x.TransformContinuousIndexToPhysicalPoint(rotation_centre)
 
         max_pixel = torch.Tensor([self.max_pixels[0], self.max_pixels[1]])
-        pixel = (-max_pixel + 2 * max_pixel * torch.rand(2)).numpy()
+        pixel = (-max_pixel + 2 * max_pixel * torch.rand(2)).numpy().astype(np.float64)
 
         rotation = sitk.Euler3DTransform(
             rotation_centre,
@@ -85,75 +103,69 @@ class AffineTransform:
             angle,  # the angle of rotation around the z-axis, in radians -> axial rotation
             (pixel[0], pixel[1], 0.0)  # translation
         )
-        return sitk.Resample(X, X, rotation, sitk.sitkLinear, self.fill_value)
+        image_x = sitk.Resample(image_x, image_x, rotation, sitk.sitkLinear, self.fill_value)
+        image_y = sitk.Resample(image_y, image_y, rotation, sitk.sitkLinear, self.fill_value)
+
+        return image_x, image_y
 
     def __repr__(self):
         return f"{self.__class__.__name__}(max_angle={self.max_angle}, fill_value={self.fill_value})"
 
 
+
+
+
 class ToTensor:
     """Convert a SimpleITK image to torch.Tensor."""
-    def __call__(self, image: sitk.Image) -> torch.Tensor:
+    def __call__(self, image_xy : Tuple[sitk.Image, sitk.Image]) -> Tuple[torch.Tensor, torch.Tensor]:
         """Apply the transform.
 
         Parameters
         ----------
-        image
-            Image to convert to tensor.
+        image_xy
+            A tuple containing the image from domain X and Y to transform.
 
         Returns
         -------
-        torch.Tensor
-            The converted tensor.
+        Tuple[sitk.Image, sitk.Image]
+            The transformed images from domain X and Y.
         """
-        array = sitk.GetArrayFromImage(image)
-        X = torch.from_numpy(array).unsqueeze(0).float()
+        image_x, image_y = image_xy
+        X, Y = sitk.GetArrayFromImage(image_x), sitk.GetArrayFromImage(image_y)
+        X = torch.from_numpy(X).unsqueeze(0).float()
+        Y = torch.from_numpy(Y).unsqueeze(0).float()
 
-        return X
+        return X, Y
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
 
+
+
+
 class Normalize :
     """ Normalize the pixel intensities in the image"""
-    def __init__(self, _min: float = -1000.0, _max: float = 1000.0) :
-        self.min = min
-        self.max = max
-    def __call__(self, image:sitk.Image) -> torch.Tensor :
+    def __init__(self, min_hu: float = -1000.0, max_hu: float = 1000.0) :
+        self.min = min_hu
+        self.max = max_hu
+
+    def __call__(self, image_xy : Tuple[sitk.Image, sitk.Image]) -> Tuple[sitk.Image, sitk.Image]:
+        """Apply the transform.
+
+        Parameters
+        ----------
+        image_xy
+            A tuple containing the image from domain X and Y to transform.
+
+        Returns
+        -------
+        Tuple[sitk.Image, sitk.Image]
+            The transformed images from domain X and Y.
+        """
+        image_x, image_y = image_xy
         f = sitk.ClampImageFilter()
-        f.SetLowerBound(_min)
-        f.SetUpperBound(_max)
-        return (f.Execute(image)) / 2000.0
-
-if __name__ == '__main__':
-    import os
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use("Qt5Agg")
-    import pandas as pd
-
-    # Test on some images
-    # Load trg data
-    trg_path = "/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
-    img_path = "/cluster/projects/radiomics/Temp/colin/isotropic_npy/images"
-
-    df = pd.read_csv(trg_path, index_col="p_index", dtype=str)
-
-    # Load an image
-    X = np.load(os.path.join(img_path, df.at[0, "patient_id"])+".npy")
-    z, y, x = X.shape
-
-    plt.ion()
-
-    plt.figure(1)
-    plt.imshow(X[z//2, : , :])
-    plt.show()
-
-    X = affine_transform(X, angle=45, pixels=(20, 20) )
-
-    plt.ioff()
-
-    plt.figure(2)
-    plt.imshow(X[z//2, : , :])
-    plt.show()
+        f.SetLowerBound(self.min)
+        f.SetUpperBound(self.max)
+        scale = 1000.0
+        return (f.Execute(image_x)) / scale, (f.Execute(image_y)) / scale

@@ -26,7 +26,7 @@ path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
 csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
 img_path="/cluster/projects/radiomics/RADCURE-images/"
 log_path="/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN"
-cache_path="/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/unpaired_train"
+cache_path="/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/"
 
 ### EDIT BELOW ###
 # Hyperparameters for training the model
