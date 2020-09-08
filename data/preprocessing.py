@@ -35,7 +35,7 @@ def resample_image(image: sitk.Image,
         directions. Alternatively, a sequence of floats can be passed to
         specify spacing along each dimension. Passing 0 at any position will
         keep the original spacing along that dimension (useful for in-plane
-        resampling).
+        resampling). If list, assumes format [x, y, z].
 
     interpolation, optional
         The interpolation method to use. Valid options are:

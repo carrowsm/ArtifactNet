@@ -155,6 +155,7 @@ class BaseDataset(Dataset):
         # Get the correct function to load the raw image type
         self.load_img = self._get_img_loader()
         self.full_df = pd.concat([self.X_df, self.Y_df])
+        self.full_df["img_center"] = np.nan # col for keeping track of subvolume centre
 
         print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
         Parallel(n_jobs=self.num_workers)(
@@ -169,7 +170,7 @@ class BaseDataset(Dataset):
         image = read_dicom_image(path)
         da_idx = int(self.full_df.at[patient_id, self.da_slice_col])
 
-        # Resample image and DA slice to [1,1,1] voxel spacing
+        # Resample image and DA slice to [1,1,1] mm voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
         image = resample_image(image, [1.0, 1.0, 1.0])
         da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
@@ -184,6 +185,10 @@ class BaseDataset(Dataset):
         crop_centre = np.array([x, y, da_z])
         crop_size   = self.img_size[::-1] # Reverse array to comply with sitk indexing
 
+        # Save the location of the centre of the image
+        phys_centre = image.TransformIndexToPhysicalPoint((x, y, da_z))
+        self.full_df.at[patient_id, "img_center"] = phys_centre
+
         # Crop to required size around this point
         _min = np.floor(crop_centre - crop_size / 2).astype(np.int64)
         _max = np.floor(crop_centre + crop_size / 2).astype(np.int64)
@@ -192,6 +197,8 @@ class BaseDataset(Dataset):
 
         # Save the image
         sitk.WriteImage(image, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
+
+
 
 
     def __getitem__(self, index) :
