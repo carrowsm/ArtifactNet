@@ -10,24 +10,9 @@ from skimage.transform import resize
 from preprocessing import resample_image, get_dicom_path, read_dicom_image
 
 
-def insert_volume(subvolume: sitk.Image, full_image: sitk.Image) -> sitk.Image :
-    """ Insert a subvolume into the original image, replacing those pixels.
-    """
-    spacing = full_image.GetSpacing()
-    origin  = full_image.GetOrigin()
-    subvol_size = subvolume.GetSpacing()
-
-    # Resample subvolume to match original image
-    subvolume = resample_image(subvolume, spacing)
 
 
-    return
 
-
-def process_one_image(gen_img: torch.Tensor, patient_id: str) :
-    """
-    """
-    # Read patient's full DICOM image
 
 class PostProcessor :
     """PostProcessor class to take the ouput tensor from a model and save it as
@@ -59,7 +44,7 @@ class PostProcessor :
 
         # Get the correct function to with which to save images
         if self.output_file_type == 'nrrd' :
-            self.save_outout_img = sitk.WriteImage
+            self.save_output_img = sitk.WriteImage
         elif self.output_file_type == 'dicom' :
             raise NotImplementedError(
             "Saving output as DICOM is not currently supported. Please use 'nrrd'.")
@@ -93,6 +78,19 @@ class PostProcessor :
         # Resample subvolume image to the same spacing as full image
         full_img_spacing = full_img.GetSpacing()
         sub_img = resample_image(sub_img, full_img_spacing)
-        sub_img_size = sub_img.GetSize()
+        sub_img_size = np.array(sub_img.GetSize())
 
-        # Get the coordinates of the
+        # Get the index of the subvolume center
+        sub_img_center = np.array(full_img.TransformPhysicalPointToIndex(img_centre))
+
+        # Insert the subvolume pixels into the full original image
+        _min = np.floor(sub_img_center - sub_img_size / 2).astype(np.int64)
+        _max = np.floor(sub_img_center + sub_img_size / 2).astype(np.int64)
+        full_img[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]] = sub_img
+
+        # Resample the resulting image to the required spacing
+        full_img = resample_image(full_img, self.output_spacing)
+
+        # Save the image
+        file_name = f"{patient_id}.{output_file_type}"
+        self.save_output_img(full_img, os.path.join(output_dir, file_name))
