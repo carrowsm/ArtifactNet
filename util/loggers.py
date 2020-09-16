@@ -49,7 +49,7 @@ class TensorBoardCustom(TensorBoardLogger):
         2D tensors:
         X.shape == (N, 1, D, H, W) or
         X       == [x_real, y_fake, y_real, x_fake] """
-        cm = ['viridis', "Greys"]
+        cm = ['viridis', "Greys_r"]
 
         if isinstance(X, list) :
             N = len(X)   # X is a list of 2D tensors
