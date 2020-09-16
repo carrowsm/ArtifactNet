@@ -7,9 +7,7 @@ from typing import Callable, Optional, Union, Sequence
 import SimpleITK as sitk
 from skimage.transform import resize
 
-from preprocessing import resample_image, get_dicom_path, read_dicom_image
-
-
+from data.preprocessing import resample_image, read_dicom_image, read_nrrd_image
 
 
 
@@ -21,35 +19,47 @@ class PostProcessor :
     def __init__(self,
                  input_dir: str,
                  output_dir: str,
-                 output_spacing: Sequence = [3, 1, 1],
+                 output_spacing: Sequence = [1, 1, 3],
+                 input_file_type: str = "DICOM",
                  output_file_type: str = "nrrd"):
         """ Initialize the class
         Parameters
         ----------
         input_dir (str)
-            The directory containing the original DICOM images. Each patient's
-            DICOM series should be contained in  a subdirectory named with the
-            patient's ID.
+            The directory containing the original images. Each patient's image
+            should be contained in a subdirectory named with the patient's ID.
         output_dir (str)
             The directory in which to save the generated images.
         output_spacing (Callable)
-            The spacing of the output SITK file. Expected to be [z, y, x].
+            The spacing of the output SITK file. Expected to be [x, y, z].
+        input_file_type (str)
+            The file type of the original images. Can be 'DICOM' or 'nrrd'.
         output_file_type (str)
-            The file type to save the output files. Either 'nrrd' or 'dicom'.
+            The file type to save the output files. Can be 'DICOM' or 'nrrd'.
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.output_spacing = output_spacing
+        self.input_file_type = input_file_type
         self.output_file_type = output_file_type
+
+        # Get the correct function to with which to load images
+        if self.input_file_type == 'nrrd' :
+            self.read_original_img = read_nrrd_image
+        elif self.input_file_type == 'DICOM' :
+            self.read_original_img = read_dicom_image
+        else :
+            raise NotImplementedError("input_file_type must be 'DICOM' or 'nrrd'.")
 
         # Get the correct function to with which to save images
         if self.output_file_type == 'nrrd' :
             self.save_output_img = sitk.WriteImage
-        elif self.output_file_type == 'dicom' :
+        elif self.output_file_type == 'DICOM' :
             raise NotImplementedError(
             "Saving output as DICOM is not currently supported. Please use 'nrrd'.")
         else :
             raise NotImplementedError("output_file_type must be 'dicom' or 'nrrd'.")
+
 
 
     def __call__(self, model_output: torch.Tensor, patient_id: str, img_centre: Sequence) :
@@ -65,32 +75,39 @@ class PostProcessor :
         patient_id (str)
             The patient ID or MRN of the current patient. This will be used to
             access the original DICOM and save the output.
-        center_xyz (Sequence)
+        img_centre (Sequence, [x, y, z])
             The location of the centre of the subvolume in physical coordinates.
         """
+        if len(model_output.shape) > 3 :
+            model_output = model_output[0, 0, :, :, :]
+
+        # Convert model output image back to HU
+        model_output = model_output * 1000.0 # Make range (-1000, 1000)
+
         # Convert the tensor image to SITK (with 1mm voxel spacing)
         sub_img = sitk.GetImageFromArray(model_output.numpy())
 
-        # Load DICOM image
-        dicom_path = get_dicom_path(os.path.join(self.input_dir, patient_id))
-        full_img = read_dicom_image(dicom_path)
+        # Load original (uncorrected) image
+        orig_path = os.path.join(self.input_dir, f"{patient_id}.{self.input_file_type}")
+        full_img = self.read_original_img(orig_path)
+        full_img = sitk.Clamp(full_img, lowerBound=-1000.0, upperBound=1000.0)
 
-        # Resample subvolume image to the same spacing as full image
-        full_img_spacing = full_img.GetSpacing()
-        sub_img = resample_image(sub_img, full_img_spacing)
+        # Resample full image to the same spacing as subvolume image
         sub_img_size = np.array(sub_img.GetSize())
+        full_img = resample_image(full_img, [1.0, 1.0, 1.0])
 
         # Get the index of the subvolume center
         sub_img_center = np.array(full_img.TransformPhysicalPointToIndex(img_centre))
 
         # Insert the subvolume pixels into the full original image
-        _min = np.floor(sub_img_center - sub_img_size / 2).astype(np.int64)
-        _max = np.floor(sub_img_center + sub_img_size / 2).astype(np.int64)
-        full_img[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]] = sub_img
+        _min = np.floor(sub_img_center - sub_img_size / 2).astype(int)
+        _max = np.floor(sub_img_center + sub_img_size / 2).astype(int)
+        full_img = sitk.Paste(full_img, sub_img, sub_img.GetSize(),
+                              destinationIndex=_min.tolist() )
 
         # Resample the resulting image to the required spacing
         full_img = resample_image(full_img, self.output_spacing)
 
         # Save the image
-        file_name = f"{patient_id}.{output_file_type}"
-        self.save_output_img(full_img, os.path.join(output_dir, file_name))
+        file_name = f"{patient_id}.{self.output_file_type}"
+        self.save_output_img(full_img, os.path.join(self.output_dir, file_name))

@@ -1,13 +1,15 @@
 import os
 import sys
 from typing import Callable, Optional, Tuple, Sequence
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
+from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
 from skimage.filters import threshold_otsu
 from scipy import ndimage
 import SimpleITK as sitk
+from sklearn.model_selection import train_test_split
 
 import torch
 from torch.utils.data import Dataset
@@ -18,31 +20,45 @@ from data.transforms import AffineTransform
 
 
 def load_image_data_frame(path, img_X: Sequence[str], img_Y: Sequence[str],
-                          label_col="has_artifact") :
+                          label_col="has_artifact", val_split=0.1) :
     """ Load data Frame containing the DA label and location of each patient
     Parameters :
     ------------
-    path (str) :    Full path to the CSV containing the image IDs and corresponding
-                    labels.
-    img_X (list) :  The CSV label for images in domain X. Must be a list of labels
-                    as strings. The union of all labels in the list will be used.
-    img_Y (list) :  The CSV label for images in domain Y.
-    label_col (str):The CSV column name containing the image labels. Default is
-                    'has_artifact'.
+    path (str)
+        Full path to the CSV containing the image IDs and corresponding labels.
+    img_X (list) :
+        The CSV label for images in domain X. Must be a list of labels as strings.
+        The union of all labels in the list will be used.
+    img_Y (list)
+        The CSV label for images in domain Y.
+    label_col (str)
+        The CSV column name containing the image labels. Default is 'has_artifact'.
+    val_split (float)
+        Proportion of data to use for validation set. If 0.0, return empty
+        validation dataframes.
     Returns :
     ---------
-    One DF for each image domain with the z-index of the DA slice for each patient.
+    split data: Tuple, length = 4
+        The X-domain and Y-domain data for the train and validation sets
+        (total of 4 data frames).
     """
     df = pd.read_csv(path,
-                     usecols=["patient_id", label_col, "DA_z", "a_slice"],
+                     # usecols=["patient_id", label_col, "DA_z", "a_slice"],
                      dtype=str, na_values=['nan', 'NaN', ''])
     df.set_index("patient_id", inplace=True)
     df["DA_z"] = df["DA_z"].astype(int)
 
-    X_df = df[df[label_col].isin(img_X)]  # Patients in domain X (DA+)
-    Y_df = df[df[label_col].isin(img_Y)]  # Patients in domain X (DA-)
+    if val_split == 0 : # Create only a training set
+        trg_df, val_df = df, pd.DataFrame(data={label_col: []}) # Empty DF for val set
+    else :             # Get patient IDs for traing and val sets
+        trg_df, val_df = train_test_split(df, test_size=val_split,
+                                            stratify=df[label_col].values)
+    x_df_trg = trg_df[trg_df[label_col].isin(img_X)]  # Patients in domain X (DA+)
+    x_df_val = val_df[val_df[label_col].isin(img_X)]  # Patients in domain X (DA+)
+    y_df_trg = trg_df[trg_df[label_col].isin(img_Y)]  # Patients in domain Y (DA-)
+    y_df_val = val_df[val_df[label_col].isin(img_Y)]  # Patients in domain Y (DA-)
 
-    return X_df, Y_df
+    return x_df_trg, x_df_val, y_df_trg, y_df_val
 
 
 
@@ -83,7 +99,7 @@ class BaseDataset(Dataset):
         cache_dir :
             The path to the directory in which to cache preprocessed images.
         file_type: str, (default: "nrrd")
-            The file type to load. Can be either "npy" or "nrrd" or "dicom".
+            The file type to load. Can be either "npy" or "nrrd" or "DICOM".
         image_size : int, list, None
             The size of the image to use (same for both domains X and Y).
             - If None, use the entire image (centre_pix will be ignored).
@@ -118,6 +134,7 @@ class BaseDataset(Dataset):
         self.patient_id_col = patient_id_col
         self.da_size_col = da_size_col
         self.da_slice_col = da_slice_col
+        self.first_cache = False # indicate if 1st time data has been cached
 
         # Get the number of images in each domain
         self.x_size, self.y_size = len(X_df), len(Y_df)
@@ -155,19 +172,28 @@ class BaseDataset(Dataset):
         # Get the correct function to load the raw image type
         self.load_img = self._get_img_loader()
         self.full_df = pd.concat([self.X_df, self.Y_df])
-        self.full_df["img_center"] = np.nan # col for keeping track of subvolume centre
+
 
         print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
-        Parallel(n_jobs=self.num_workers)(
-            delayed(self._preprocess_image)(patient_id)
-            for patient_id in self.full_df.index)
+        # Parallel(n_jobs=self.num_workers)(
+        #     delayed(self._preprocess_image)(patient_id)
+        #     for patient_id in self.full_df.index)
+        with Pool(self.num_workers) as p:
+            center_coords = p.map(self._preprocess_image, self.full_df.index)
+
+        # Keep track of subvolume centre
+        coords_array = np.array(center_coords)
+        self.full_df["img_center_x"] = coords_array[:, 0]
+        self.full_df["img_center_y"] = coords_array[:, 1]
+        self.full_df["img_center_z"] = coords_array[:, 2]
+        self.first_cache = True # indicate if 1st time data has been cached
 
 
     def _preprocess_image(self, patient_id: str) :
         """Preprocess and cache a single image."""
         # Load image and DA index in original voxel spacing
-        path = os.path.join(self.img_dir, patient_id)
-        image = read_dicom_image(path)
+        path = os.path.join(self.img_dir, f"{patient_id}.{self.file_type}")
+        image = self.load_img(path)
         da_idx = int(self.full_df.at[patient_id, self.da_slice_col])
 
         # Resample image and DA slice to [1,1,1] mm voxel spacing
@@ -185,20 +211,17 @@ class BaseDataset(Dataset):
         crop_centre = np.array([x, y, da_z])
         crop_size   = self.img_size[::-1] # Reverse array to comply with sitk indexing
 
-        # Save the location of the centre of the image
-        phys_centre = image.TransformIndexToPhysicalPoint((x, y, da_z))
-        self.full_df.at[patient_id, "img_center"] = phys_centre
-
         # Crop to required size around this point
         _min = np.floor(crop_centre - crop_size / 2).astype(np.int64)
         _max = np.floor(crop_centre + crop_size / 2).astype(np.int64)
-        image = image[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]]
+        subvol = image[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]]
         ### --------- ###
 
         # Save the image
-        sitk.WriteImage(image, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
+        sitk.WriteImage(subvol, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
 
-
+        # Save the location of the centre of the image
+        return image.TransformIndexToPhysicalPoint((x, y, da_z))
 
 
     def __getitem__(self, index) :

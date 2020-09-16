@@ -147,8 +147,10 @@ class ToTensor:
 class Normalize :
     """ Normalize the pixel intensities in the image"""
     def __init__(self, min_hu: float = -1000.0, max_hu: float = 1000.0) :
-        self.min = min_hu
-        self.max = max_hu
+        self.f = sitk.ClampImageFilter()
+        self.f.SetLowerBound(min_hu)
+        self.f.SetUpperBound(max_hu)
+        self.scale = 1000.0
 
     def __call__(self, image_xy : Tuple[sitk.Image, sitk.Image]) -> Tuple[sitk.Image, sitk.Image]:
         """Apply the transform.
@@ -164,8 +166,34 @@ class Normalize :
             The transformed images from domain X and Y.
         """
         image_x, image_y = image_xy
-        f = sitk.ClampImageFilter()
-        f.SetLowerBound(self.min)
-        f.SetUpperBound(self.max)
-        scale = 1000.0
-        return (f.Execute(image_x)) / scale, (f.Execute(image_y)) / scale
+        image_x = (self.f.Execute(image_x)) / self.scale
+        image_y = (self.f.Execute(image_y)) / self.scale
+
+        return image_x, image_y
+
+
+
+
+class HorizontalFlip:
+    """Flip the image about the vertical axis.
+    """
+    def __call__(self, image_xy : Tuple[sitk.Image, sitk.Image]) -> Tuple[sitk.Image, sitk.Image] :
+        """Apply the transform.
+
+        Parameters
+        ----------
+        image_xy
+            A tuple containing the image from domain X and Y to transform
+
+        Returns
+        -------
+        Tuple[sitk.Image, sitk.Image]
+            The transformed images from domain X and Y.
+        """
+        x, y = image_xy
+
+        # Randomly perform the flip (50% of the time)
+        if np.random.random() > 0.5 :
+            x = sitk.Flip(x, [True, False, False])
+            y = sitk.Flip(y, [True, False, False])
+        return x, y
