@@ -31,7 +31,7 @@ import pytorch_lightning as pl
 from config.options import get_args
 
 from data.data_loader import load_image_data_frame, UnpairedDataset, PairedDataset
-from data.transforms import AffineTransform, ToTensor, Normalize
+from data.transforms import AffineTransform, ToTensor, Normalize, HorizontalFlip
 
 from models.generators import UNet3D, ResNetK, UNet2D, UNet3D_3layer
 from models.discriminators import CNN_3D, PatchGAN_NLayer, CNNnLayer
@@ -141,41 +141,65 @@ class GAN(pl.LightningModule) :
         # Get train and test data sets
         # Import CSV containing DA labels
         X_img, Y_img = self.hparams.img_domain_x, self.hparams.img_domain_y
-        y_df, n_df = load_image_data_frame(self.hparams.csv_path, X_img, Y_img)
+        test_csv = "/cluster/home/carrowsm/ArtifactNet/datasets/test_labels.csv"
 
-        # Create train and validation sets for each DA+ and DA- imgs
-        ### Train-val split, if needed
-        val_x_path = "/cluster/home/carrowsm/ArtifactNet/datasets/reza_test_X.csv"
-        val_y_path = "/cluster/home/carrowsm/ArtifactNet/datasets/reza_test_Y.csv"
-        val_x_df = pd.read_csv(val_x_path, dtype=str).set_index("patient_id")
-        val_y_df = pd.read_csv(val_y_path, dtype=str).set_index("patient_id")
-
+        x_df_trg, x_df_val, y_df_trg, y_df_val = load_image_data_frame(
+                                            self.hparams.csv_path, X_img, Y_img,
+                                            val_split=0.1) # Use 10% of data for val
+        x_df_test, _, y_df_test, _ = load_image_data_frame(test_csv,
+                                                           X_img, Y_img,
+                                                           val_split=0)
         # Define sequence of transforms
         trg_transform = torchvision.transforms.Compose([
-                    AffineTransform(max_angle=20.0, max_pixels=[20, 20]),
+                    HorizontalFlip(),
+                    AffineTransform(max_angle=30.0, max_pixels=[20, 20]),
                     Normalize(-1000.0, 1000.0),
                     ToTensor()])
-        val_transform = torchvision.transforms.Compose([ ToTensor() ])
+        val_transform = torchvision.transforms.Compose([
+                                                Normalize(-1000.0, 1000.0),
+                                                ToTensor()])
+        test_transform = val_transform
 
         # Train data loader
-        trg_dataset = UnpairedDataset(y_df, n_df,
+        trg_dataset = UnpairedDataset(x_df_trg, y_df_trg,
                                       image_dir=self.hparams.img_dir,
-                                      cache_dir=os.path.join(self.hparams.cache_dir, "unpaired_train"),
+                                      cache_dir=os.path.join(self.hparams.cache_dir,
+                                                             "unpaired"),
                                       file_type="DICOM",
                                       image_size=self.image_size,
                                       dim=self.dimension,
                                       transform=trg_transform,
                                       num_workers=self.hparams.n_cpus)
-        val_dataset = PairedDataset(val_x_df, val_x_df,
-                                    image_dir=os.path.join(self.hparams.cache_dir, "paired_test"),
-                                    cache_dir=os.path.join(self.hparams.cache_dir, "paired_test"),
-                                    image_size=self.image_size,
-                                    dim=self.dimension,
-                                    transform=val_transform,
-                                    num_workers=self.hparams.n_cpus)
+        val_dataset = UnpairedDataset(x_df_val, y_df_val,
+                                      image_dir=self.hparams.img_dir,
+                                      cache_dir=os.path.join(self.hparams.cache_dir,
+                                                             "unpaired"),
+                                      file_type="DICOM",
+                                      image_size=self.image_size,
+                                      dim=self.dimension,
+                                      transform=val_transform,
+                                      num_workers=self.hparams.n_cpus)
+        test_dataset = UnpairedDataset(x_df_test, y_df_test,
+                                      image_dir=self.hparams.img_dir,
+                                      cache_dir=os.path.join(self.hparams.cache_dir,
+                                                             "unpaired"),
+                                      file_type="DICOM",
+                                      image_size=self.image_size,
+                                      dim=self.dimension,
+                                      transform=test_transform,
+                                      num_workers=self.hparams.n_cpus)
 
         self.trg_dataset = trg_dataset
         self.val_dataset = val_dataset
+        self.test_dataset = test_dataset
+
+        # If caching data for the first time, save the image centre coordinates
+        if trg_dataset.first_cache and val_dataset.first_cache :
+            df = pd.concat([trg_dataset.full_df, val_dataset.full_df])
+            df.to_csv(self.hparams.csv_path)
+        if test_dataset.first_cache :
+            test_dataset.full_df.to_csv(test_csv)
+
 
 
     def on_train_start(self):
@@ -204,7 +228,7 @@ class GAN(pl.LightningModule) :
         data_loader = DataLoader(self.val_dataset,
                                  batch_size=1,
                                  shuffle=False,
-                                 num_workers=1,
+                                 num_workers=self.hparams.n_cpus - 1,
                                  drop_last=True,
                                  pin_memory=True)
         return data_loader
@@ -219,6 +243,7 @@ class GAN(pl.LightningModule) :
         fake_X = self.g_x(real_Y)               # G_X(Y)
         cycl_Y = self.g_y(fake_X)               # G_Y(G_X(Y))
         return fake_Y, cycl_X, fake_X, cycl_Y
+
 
 
     def training_step(self, batch, batch_nb, optimizer_idx) :
@@ -359,11 +384,12 @@ class GAN(pl.LightningModule) :
         ### -- ------------- -- ###
 
         # Save the losses in a dictionary
-        output = OrderedDict({'d_loss_val': D_loss,
-                              'g_loss_val': G_loss,
-                              })
+        output = OrderedDict({'d_loss_val': D_loss, 'g_loss_val': G_loss})
 
-        ### Log some sample images once per epoch ###
+        # Compute 'accuracy'
+        # output["acc"] = self.l1_loss(gen_y, y)# Comment out if val set is unpaired
+
+        ### Log some sample images once per val_step ###
         if batch_idx == 0 :
             if self.dimension == 2 :
                 images = [    x[0, self.image_size[0] // 2, :, :].cpu(),
@@ -375,11 +401,10 @@ class GAN(pl.LightningModule) :
                           gen_y[0, 0, self.image_size[0] // 2, :, :].cpu(),
                               y[0, 0, self.image_size[0] // 2, :, :].cpu(),
                           gen_x[0, 0, self.image_size[0] // 2, :, :].cpu()]
-
             # Plot the image
-            self.logger.add_mpl_img(f'imgs/epoch{self.current_epoch}',
+            self.logger.add_mpl_img(f'imgs',
                                     images,
-                                    self.global_step,
+                                    self.current_epoch,
                                     clip_vals=True)
 
         return output
@@ -422,19 +447,17 @@ class GAN(pl.LightningModule) :
                                  self.d_y.parameters()), lr=lr, betas=(b1, b2),
                                  weight_decay=self.hparams.weight_decay)
 
-        scheduler_g = {# This scheduler will reduce lr if it plateaus for 2 epochs
-                       'scheduler': ReduceLROnPlateau(opt_g, 'min', patience=2,
+        scheduler_g = {# Scheduler will reduce lr if loss plateaus for 7 epochs
+                       'scheduler': ReduceLROnPlateau(opt_g, 'min', patience=7,
                                                       verbose=True, factor=0.5),
                        'monitor': 'g_loss_val', # Default: val_loss
                        'interval': 'epoch',
-                       'frequency': 1
-                       }
-        scheduler_d = {'scheduler': ReduceLROnPlateau(opt_d, 'min', patience=2,
+                       'frequency': 1}
+        scheduler_d = {'scheduler': ReduceLROnPlateau(opt_d, 'min', patience=7,
                                                       verbose=True, factor=0.5),
                        'monitor': 'd_loss_val', # Default: val_loss
                        'interval': 'epoch',
-                       'frequency': 1
-                       }
+                       'frequency': 1}
         return [opt_g, opt_d], [scheduler_g, scheduler_d]
 
 
@@ -456,8 +479,8 @@ def main(hparams):
     # 2 INIT LOGGER -  Custom logger defined in loggers.py
     # ------------------------
     log_name = str(hparams.image_size)[1 : -1].replace(", ", "_") +\
-                    "px/"+ "_".join(hparams.img_domain_x) + "-" +\
-                    "_".join(hparams.img_domain_y)
+                    "px/"+ "u".join(hparams.img_domain_x) + "-" +\
+                    "u".join(hparams.img_domain_y)
     print(log_name)
     logger = TensorBoardCustom(hparams.log_dir, name=log_name)
 
@@ -477,13 +500,13 @@ def main(hparams):
     trainer = pl.Trainer(logger=logger,
                          # accumulate_grad_batches=10,
                          # gradient_clip_val=0.1,
-                         val_percent_check=1,
+                         # val_percent_check=1,
                          amp_level='O1', precision=16, # Enable 16-bit presicion
                          gpus=hparams.n_gpus,
                          num_nodes=1,
                          distributed_backend="ddp",
                          benchmark=True,
-                         val_check_interval=0.2    # Check validation 5 times per epoch
+                         # val_check_interval=0.2    # Check validation 5 times per epoch
                          )
 
     # ------------------------
