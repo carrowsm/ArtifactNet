@@ -1,7 +1,6 @@
 import os
 import sys
 from typing import Callable, Optional, Tuple, Sequence
-# from joblib import Parallel, delayed
 from multiprocessing import Pool
 
 import numpy as np
@@ -175,11 +174,11 @@ class BaseDataset(Dataset):
 
 
         print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
-        # Parallel(n_jobs=self.num_workers)(
-        #     delayed(self._preprocess_image)(patient_id)
-        #     for patient_id in self.full_df.index)
-        with Pool(self.num_workers) as p:
-            center_coords = p.map(self._preprocess_image, self.full_df.index)
+        if self.num_workers > 1 :
+            with Pool(self.num_workers) as p:
+                center_coords = p.map(self._preprocess_image, self.full_df.index)
+        else :
+            center_coords = [self._preprocess_image(i) for i in self.full_df.index]
 
         # Keep track of subvolume centre
         coords_array = np.array(center_coords)
