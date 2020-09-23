@@ -2,10 +2,9 @@ import io
 import os
 import numpy as np
 import torch
-from typing import Callable, Optional, Union, Sequence
+from typing import Union, Sequence
 
 import SimpleITK as sitk
-from skimage.transform import resize
 
 from data.preprocessing import resample_image, read_dicom_image, read_nrrd_image
 
@@ -30,7 +29,7 @@ class PostProcessor :
             should be contained in a subdirectory named with the patient's ID.
         output_dir (str)
             The directory in which to save the generated images.
-        output_spacing (Callable, str)
+        output_spacing (Sequence, str)
             The spacing of the output SITK file. Expected to be [x, y, z]. If
             'orig', the original spacing will be used.
         input_file_type (str)
