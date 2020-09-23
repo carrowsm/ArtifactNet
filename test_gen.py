@@ -44,8 +44,6 @@ def load_model(module: pl.LightningModule, checkpoint_path: str) :
     model.eval()
     return model
 
-def process_one_image() :
-    pass
 
 
 def main(args) :
@@ -82,7 +80,7 @@ def main(args) :
     # Initialize the postprocessor
     postprocess = PostProcessor(input_dir=args.in_img_dir,
                                 output_dir=args.out_img_dir,
-                                output_spacing=[1, 1, 3],
+                                output_spacing='orig',
                                 input_file_type="nrrd",
                                 output_file_type="nrrd")
 
@@ -135,11 +133,10 @@ if __name__ == '__main__':
     # img_dir = "/cluster/projects/radiomics/RADCURE-images/"        # Raw DICOM images
     img_dir = "/cluster/projects/radiomics/RADCURE-challenge/data/test/images"
     # log_dir = "/cluster/projects/radiomics/Temp/colin/oar_test_clean"
-    log_dir = "/cluster/projects/radiomics/Temp/colin/radcure_challenge_test"
+    log_dir = "/cluster/projects/radiomics/Temp/colin/radcure_challenge"
     # cache = "/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/unpaired"
     cache = "/cluster/home/carrowsm/img-cache"
-    checkpoint_path = "/cluster/home/carrowsm/logs/artifact_net/remove/cycleGAN/\
-8_256_256px/2_1-0/version_2/checkpoints/epoch=48.ckpt"
+    checkpoint_path = "/cluster/home/carrowsm/logs/cycleGAN/8_256_256px/2u1-0/version_2/checkpoints/epoch=48.ckpt"
 
     parser = ArgumentParser()
 

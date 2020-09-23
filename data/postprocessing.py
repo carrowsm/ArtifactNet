@@ -19,7 +19,7 @@ class PostProcessor :
     def __init__(self,
                  input_dir: str,
                  output_dir: str,
-                 output_spacing: Sequence = [1, 1, 3],
+                 output_spacing: Union[Sequence, str] = "orig",
                  input_file_type: str = "DICOM",
                  output_file_type: str = "nrrd"):
         """ Initialize the class
@@ -30,8 +30,9 @@ class PostProcessor :
             should be contained in a subdirectory named with the patient's ID.
         output_dir (str)
             The directory in which to save the generated images.
-        output_spacing (Callable)
-            The spacing of the output SITK file. Expected to be [x, y, z].
+        output_spacing (Callable, str)
+            The spacing of the output SITK file. Expected to be [x, y, z]. If
+            'orig', the original spacing will be used.
         input_file_type (str)
             The file type of the original images. Can be 'DICOM' or 'nrrd'.
         output_file_type (str)
@@ -90,11 +91,13 @@ class PostProcessor :
         # Load original (uncorrected) image
         orig_path = os.path.join(self.input_dir, f"{patient_id}.{self.input_file_type}")
         full_img = self.read_original_img(orig_path)
+        orig_spacing = full_img.GetSpacing()
         full_img = sitk.Clamp(full_img, lowerBound=-1000.0, upperBound=1000.0)
 
-        # Resample full image to the same spacing as subvolume image
+        # Resample sub image to the same spacing as full image
         sub_img_size = np.array(sub_img.GetSize())
-        full_img = resample_image(full_img, [1.0, 1.0, 1.0])
+        # full_img = resample_image(full_img, [1.0, 1.0, 1.0])
+        sub_img = resample_image(sub_img, orig_spacing)
 
         # Get the index of the subvolume center
         sub_img_center = np.array(full_img.TransformPhysicalPointToIndex(img_centre))
@@ -106,7 +109,8 @@ class PostProcessor :
                               destinationIndex=_min.tolist() )
 
         # Resample the resulting image to the required spacing
-        full_img = resample_image(full_img, self.output_spacing)
+        if self.output_spacing != 'orig' :
+            full_img = resample_image(full_img, self.output_spacing)
 
         # Save the image
         file_name = f"{patient_id}.{self.output_file_type}"
