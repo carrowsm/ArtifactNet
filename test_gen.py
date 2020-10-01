@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 import torchvision
 import json
+import shutil
 
 from torch.utils.data import DataLoader
 
@@ -75,7 +76,6 @@ def main(args) :
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False,
                             num_workers=args.n_cpus)
     print("Dataloaders created.")
-    print(f"Generating {len(dataset)} clean images.")
 
     # Initialize the postprocessor
     postprocess = PostProcessor(input_dir=args.in_img_dir,
@@ -83,6 +83,18 @@ def main(args) :
                                 output_spacing='orig',
                                 input_file_type="nrrd",
                                 output_file_type="nrrd")
+
+
+    ### COPY CLEAN IMAGES ###
+    print(f"Copying {len(y_df.index)} clean images")
+    for patient_id in y_df.index :
+        from_path = os.path.join(args.in_img_dir, f"{patient_id}.nrrd")
+        to_path   = os.path.join(args.out_img_dir, "test/images/" f"{patient_id}.nrrd")
+
+        # Copy the file
+        shutil.copy(from_path, to_path)
+    ### ----------------- ###
+
 
     # Load the model from checkpoint
     model = load_model(GAN, args.checkpoint)
@@ -100,8 +112,9 @@ def main(args) :
     generator = model.g_y.to(device)
     del model # Free up memory
 
+    print(f"Generating {len(dataset)} clean images.")
 
-    # Start Test loop
+    ### GENERATE CLEAN VERSIONS OF DA+ IMAGES ###
     with torch.no_grad() :
         for i, data in enumerate(dataloader) :
             t0 = time.time()
@@ -125,6 +138,8 @@ def main(args) :
 
 
 
+
+
 if __name__ == '__main__':
     # Defaut Paths
     module_path = "/cluster/home/carrowsm/ArtifactNet/"
@@ -132,6 +147,7 @@ if __name__ == '__main__':
     csv_path = os.path.join(module_path, "datasets/radcure_challenge_test.csv")
     # img_dir = "/cluster/projects/radiomics/RADCURE-images/"        # Raw DICOM images
     img_dir = "/cluster/projects/radiomics/RADCURE-challenge/data/test/images"
+
     # log_dir = "/cluster/projects/radiomics/Temp/colin/oar_test_clean"
     log_dir = "/cluster/projects/radiomics/Temp/colin/radcure_challenge"
     # cache = "/cluster/projects/radiomics/Temp/colin/isotropic_nrrd/unpaired"
