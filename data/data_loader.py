@@ -74,6 +74,7 @@ class BaseDataset(Dataset):
                  cache_dir: str,
                  file_type: str = "DICOM",
                  image_size=[8, 256, 256],
+                 image_spacing=[1.0, 1.0, 1.0],
                  dim=3,
                  transform: Optional[Callable] = None,
                  num_workers: int = 1,
@@ -106,6 +107,8 @@ class BaseDataset(Dataset):
               a^3 aroud centre_pix.
             - If list, it should have len=3 and represent the (z, y, x) size to
               crop all images to.
+        image_spacing : List
+            The voxel spacing of the training image in mm. (z, y, x).
         dim : int
             The dimension of the output image. If 2, images will have shape
             If 2, the images will have shape(batch_size, z_size, y_size, x_size).
@@ -127,6 +130,7 @@ class BaseDataset(Dataset):
         self.cache_dir = cache_dir
         self.file_type = file_type
         self.img_size = np.array(image_size)
+        self.image_spacing = np.array(image_spacing)[::-1] # Reverse indexing for SITK
         self.dim = dim
         self.transform = transform
         self.num_workers = num_workers
@@ -144,9 +148,14 @@ class BaseDataset(Dataset):
         print("")
         if os.path.exists(sample_path) :
             # The sample file exists. Now check that the size is right
-            sample_file = sitk.GetArrayFromImage(sitk.ReadImage(sample_path))
-            if (np.array(sample_file.shape) != self.img_size).any() :
-                print(f"Image {sample_file.shape} is different from expected {self.img_size}")
+            sample_file = sitk.ReadImage(sample_path)
+            vox, size = sample_file.GetSpacing(), sample_file.GetSize()
+            if (np.array(size) != self.img_size).any() :
+                print(f"Image size {size} different than unexpected: {self.img_size}")
+                # The images are not correctly cached. Process them again
+                self._prepare_data()
+            elif (np.array(vox) != self.image_spacing).any() :
+                print(f"Voxel spacing {vox} different than unexpected: {self.image_spacing}")
                 # The images are not correctly cached. Process them again
                 self._prepare_data()
         else :
@@ -197,7 +206,7 @@ class BaseDataset(Dataset):
 
         # Resample image and DA slice to [1,1,1] mm voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
-        image = resample_image(image, [1.0, 1.0, 1.0])
+        image = resample_image(image, self.image_spacing.tolist())
         da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
 
         ### Cropping ###

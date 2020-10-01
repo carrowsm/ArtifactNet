@@ -19,7 +19,7 @@ class PostProcessor :
                  input_dir: str,
                  output_dir: str,
                  output_spacing: Union[Sequence, str] = "orig",
-                 input_file_type: str = "DICOM",
+                 input_file_type: str = "dicom",
                  output_file_type: str = "nrrd"):
         """ Initialize the class
         Parameters
@@ -33,7 +33,7 @@ class PostProcessor :
             The spacing of the output SITK file. Expected to be [x, y, z]. If
             'orig', the original spacing will be used.
         input_file_type (str)
-            The file type of the original images. Can be 'DICOM' or 'nrrd'.
+            The file type of the original images. Can be 'dicom' or 'nrrd'.
         output_file_type (str)
             The file type to save the output files. Can be 'DICOM' or 'nrrd'.
         """
@@ -46,15 +46,17 @@ class PostProcessor :
         # Get the correct function to with which to load images
         if self.input_file_type == 'nrrd' :
             self.read_original_img = read_nrrd_image
-        elif self.input_file_type == 'DICOM' :
+            self.input_suffix = ".nrrd" # Assume file is named patientID.nrrd
+        elif self.input_file_type == 'dicom' :
             self.read_original_img = read_dicom_image
+            self.input_suffix = "" # Assume file is in directory named patientID
         else :
-            raise NotImplementedError("input_file_type must be 'DICOM' or 'nrrd'.")
+            raise NotImplementedError("input_file_type must be 'dicom' or 'nrrd'.")
 
         # Get the correct function to with which to save images
         if self.output_file_type == 'nrrd' :
             self.save_output_img = sitk.WriteImage
-        elif self.output_file_type == 'DICOM' :
+        elif self.output_file_type == 'dicom' :
             raise NotImplementedError(
             "Saving output as DICOM is not currently supported. Please use 'nrrd'.")
         else :
@@ -88,15 +90,14 @@ class PostProcessor :
         sub_img = sitk.GetImageFromArray(model_output.numpy())
 
         # Load original (uncorrected) image
-        orig_path = os.path.join(self.input_dir, f"{patient_id}.{self.input_file_type}")
+        orig_path = os.path.join(self.input_dir, f"{patient_id}{self.input_suffix}")
         full_img = self.read_original_img(orig_path)
         orig_spacing = full_img.GetSpacing()
         full_img = sitk.Clamp(full_img, lowerBound=-1000.0, upperBound=1000.0)
 
         # Resample sub image to the same spacing as full image
-        sub_img_size = np.array(sub_img.GetSize())
-        # full_img = resample_image(full_img, [1.0, 1.0, 1.0])
         sub_img = resample_image(sub_img, orig_spacing)
+        sub_img_size = np.array(sub_img.GetSize())
 
         # Get the index of the subvolume center
         sub_img_center = np.array(full_img.TransformPhysicalPointToIndex(img_centre))
@@ -104,8 +105,10 @@ class PostProcessor :
         # Insert the subvolume pixels into the full original image
         _min = np.floor(sub_img_center - sub_img_size / 2).astype(int)
         _max = np.floor(sub_img_center + sub_img_size / 2).astype(int)
-        full_img = sitk.Paste(full_img, sub_img, sub_img.GetSize(),
-                              destinationIndex=_min.tolist() )
+        full_img = sitk.Paste(full_img, sub_img,
+                              sourceSize=list(sub_img.GetSize()),
+                              sourceIndex=[0, 0, 0],
+                              destinationIndex=_min.tolist())
 
         # Resample the resulting image to the required spacing
         if self.output_spacing != 'orig' :
