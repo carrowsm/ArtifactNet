@@ -1,7 +1,9 @@
 import os
 import sys
+import warnings
 from typing import Callable, Optional, Tuple, Sequence
 from multiprocessing import Pool
+from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
@@ -14,7 +16,7 @@ import torch
 from torch.utils.data import Dataset
 import torchvision
 
-from data.preprocessing import read_dicom_image, resample_image
+from data.preprocessing import read_nrrd_image, read_dicom_image, resample_image
 from data.transforms import AffineTransform
 
 
@@ -130,83 +132,92 @@ class BaseDataset(Dataset):
         self.cache_dir = cache_dir
         self.file_type = file_type
         self.img_size = np.array(image_size)
-        self.image_spacing = np.array(image_spacing)[::-1] # Reverse indexing for SITK
+        self.img_spacing = np.array(image_spacing)[::-1] # Reverse indexing for SITK
         self.dim = dim
-        self.transform = transform
+        # self.transform = transform
         self.num_workers = num_workers
         self.patient_id_col = patient_id_col
         self.da_size_col = da_size_col
         self.da_slice_col = da_slice_col
-        self.first_cache = False # indicate if 1st time data has been cached
+        self.first_cache = False
 
         # Get the number of images in each domain
         self.x_size, self.y_size = len(X_df), len(Y_df)
         self.x_ids, self.y_ids = self.X_df.index, self.Y_df.index
 
+        # Get the correct function to load the raw image type
+        self.load_img = self._get_img_loader()
+
         # Create a cache if needed. Check if cache already exists
-        sample_path = os.path.join(self.cache_dir, self.x_ids[0] + ".nrrd")
-        print("")
+        sample_path = os.path.join(self.cache_dir, f"{self.x_ids[0]}.nrrd")
+
         if os.path.exists(sample_path) :
             # The sample file exists. Now check that the size is right
             sample_file = sitk.ReadImage(sample_path)
             vox, size = sample_file.GetSpacing(), sample_file.GetSize()
+            sample_file = None
             if (np.array(size) != self.img_size).any() :
                 print(f"Image size {size} different than unexpected: {self.img_size}")
                 # The images are not correctly cached. Process them again
                 self._prepare_data()
             elif (np.array(vox) != self.image_spacing).any() :
-                print(f"Voxel spacing {vox} different than unexpected: {self.image_spacing}")
+                print(f"Voxel spacing {vox} different than unexpected: {self.img_spacing}")
                 # The images are not correctly cached. Process them again
                 self._prepare_data()
+            self._prepare_data()
         else :
             print(f"cache {sample_path} does not exist")
             # The images are not cached. Process them.
             os.makedirs(self.cache_dir, exist_ok=True)
             self._prepare_data()
+        self._prepare_data()
         print("Data successfully cached\n")
+        self.first_cache = True
+        self.transform = transform # Temporary workaround as some transforms are not pickleable
 
 
     def _get_img_loader(self) :
         if self.file_type == "nrrd" :
-            return sitk.ReadImage
+            self.img_suffix = ".nrrd"
+            return read_nrrd_image
         elif self.file_type == "DICOM" :
+            self.img_suffix = ""
             return read_dicom_image
         else :
             raise Exception(f"file_type {self.file_type} not accepted.")
 
 
+
     def _prepare_data(self) :
         """Preprocess and cache the dataset."""
-        # Get the correct function to load the raw image type
-        self.load_img = self._get_img_loader()
         self.full_df = pd.concat([self.X_df, self.Y_df])
 
-
         print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
+        tasks = [patient_id for patient_id in self.full_df.index.values]
         if self.num_workers > 1 :
-            with Pool(self.num_workers) as p:
-                center_coords = p.map(self._preprocess_image, self.full_df.index)
+            with Pool(processes=self.num_workers) as p:
+                center_coords = p.map(self._preprocess_image, tasks)
         else :
-            center_coords = [self._preprocess_image(i) for i in self.full_df.index]
+            center_coords = [self._preprocess_image(id) for id in tasks]
+
 
         # Keep track of subvolume centre
         coords_array = np.array(center_coords)
         self.full_df["img_center_x"] = coords_array[:, 0]
         self.full_df["img_center_y"] = coords_array[:, 1]
         self.full_df["img_center_z"] = coords_array[:, 2]
-        self.first_cache = True # indicate if 1st time data has been cached
 
 
     def _preprocess_image(self, patient_id: str) :
         """Preprocess and cache a single image."""
         # Load image and DA index in original voxel spacing
-        path = os.path.join(self.img_dir, f"{patient_id}.{self.file_type}")
+        path = os.path.join(self.img_dir, f"{patient_id}{self.img_suffix}")
         image = self.load_img(path)
         da_idx = int(self.full_df.at[patient_id, self.da_slice_col])
 
-        # Resample image and DA slice to [1,1,1] mm voxel spacing
+        # Resample image and DA slice to desired voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
-        image = resample_image(image, self.image_spacing.tolist())
+        image = resample_image(image, self.img_spacing.tolist())
         da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
 
         ### Cropping ###
@@ -229,7 +240,8 @@ class BaseDataset(Dataset):
         sitk.WriteImage(subvol, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
 
         # Save the location of the centre of the image
-        return image.TransformIndexToPhysicalPoint((x, y, da_z))
+        coords = image.TransformIndexToPhysicalPoint((x, y, da_z))
+        return float(coords[0]), float(coords[1]), float(coords[2])
 
 
     def __getitem__(self, index) :

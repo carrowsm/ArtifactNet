@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -t 1-00:00:00
-#SBATCH --mem=32G
+#SBATCH --mem=100G
 #SBATCH -J ArtifactNet
-#SBATCH -c 23
+#SBATCH -c 33
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
@@ -26,14 +26,14 @@ path=/cluster/home/carrowsm/ArtifactNet/cycleGAN.py
 csv_path="/cluster/home/carrowsm/ArtifactNet/datasets/train_labels.csv"
 img_path="/cluster/projects/radiomics/RADCURE-images/"
 log_path="/cluster/home/carrowsm/logs/cycleGAN"
-cache_path="/cluster/projects/radiomics/Temp/colin/cyclegan_data/2-1-1mm_nrrd/unpaired"
+cache_path="/cluster/projects/radiomics/Temp/colin/cyclegan_data/2-1-1mm_nrrd/"
 
 ### EDIT BELOW ###
 # Hyperparameters for training the model
 learn_rate=0.0002                       # Initial rate for the trainer
 batch_size=10                           # Batch size for trainer
 num_gpus=1                              # Number of GPUs to use for training
-num_cpus=22                             # Number of workers for dataloaders
+num_cpus=32                             # Number of workers for dataloaders
 num_filters=32                          # Number of input filters for the model
 ### ---------- ###
 

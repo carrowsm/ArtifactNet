@@ -167,6 +167,7 @@ class GAN(pl.LightningModule) :
                                                              "unpaired"),
                                       file_type="DICOM",
                                       image_size=self.image_size,
+                                      image_spacing=[2.0, 1.0, 1.0],
                                       dim=self.dimension,
                                       transform=trg_transform,
                                       num_workers=self.hparams.n_cpus)
@@ -176,6 +177,7 @@ class GAN(pl.LightningModule) :
                                                              "unpaired"),
                                       file_type="DICOM",
                                       image_size=self.image_size,
+                                      image_spacing=[2.0, 1.0, 1.0],
                                       dim=self.dimension,
                                       transform=val_transform,
                                       num_workers=self.hparams.n_cpus)
@@ -185,6 +187,7 @@ class GAN(pl.LightningModule) :
                                                              "unpaired"),
                                       file_type="DICOM",
                                       image_size=self.image_size,
+                                      image_spacing=[2.0, 1.0, 1.0],
                                       dim=self.dimension,
                                       transform=test_transform,
                                       num_workers=self.hparams.n_cpus)
