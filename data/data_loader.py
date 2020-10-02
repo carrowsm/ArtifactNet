@@ -131,7 +131,7 @@ class BaseDataset(Dataset):
         self.img_dir = image_dir
         self.cache_dir = cache_dir
         self.file_type = file_type
-        self.img_size = np.array(image_size)
+        self.img_size = np.array(image_size)[::-1]       # Reverse indexing for SITK
         self.img_spacing = np.array(image_spacing)[::-1] # Reverse indexing for SITK
         self.dim = dim
         # self.transform = transform
@@ -156,24 +156,23 @@ class BaseDataset(Dataset):
             sample_file = sitk.ReadImage(sample_path)
             vox, size = sample_file.GetSpacing(), sample_file.GetSize()
             sample_file = None
+
+            # Check if images are correctly cached. If not, process them again.
             if (np.array(size) != self.img_size).any() :
                 print(f"Image size {size} different than unexpected: {self.img_size}")
-                # The images are not correctly cached. Process them again
                 self._prepare_data()
-            elif (np.array(vox) != self.image_spacing).any() :
+            elif (np.array(vox) != self.img_spacing).any() :
                 print(f"Voxel spacing {vox} different than unexpected: {self.img_spacing}")
-                # The images are not correctly cached. Process them again
                 self._prepare_data()
-            self._prepare_data()
         else :
-            print(f"cache {sample_path} does not exist")
             # The images are not cached. Process them.
+            print(f"cache {sample_path} does not exist")
             os.makedirs(self.cache_dir, exist_ok=True)
             self._prepare_data()
-        self._prepare_data()
+
         print("Data successfully cached\n")
         self.first_cache = True
-        self.transform = transform # Temporary workaround as some transforms are not pickleable
+        self.transform = transform # Defined after preprocess b/c transforms can't be pickled
 
 
     def _get_img_loader(self) :
@@ -191,15 +190,15 @@ class BaseDataset(Dataset):
     def _prepare_data(self) :
         """Preprocess and cache the dataset."""
         self.full_df = pd.concat([self.X_df, self.Y_df])
-
-        print(f"Preprocessing {len(self.full_df)} images. This may take a moment.")
         tasks = [patient_id for patient_id in self.full_df.index.values]
+
+        print(f"Using {self.num_workers} CPUs to preprocess {len(tasks)} images.")
+        print("This may take a moment...")
         if self.num_workers > 1 :
             with Pool(processes=self.num_workers) as p:
                 center_coords = p.map(self._preprocess_image, tasks)
         else :
             center_coords = [self._preprocess_image(id) for id in tasks]
-
 
         # Keep track of subvolume centre
         coords_array = np.array(center_coords)
@@ -218,7 +217,7 @@ class BaseDataset(Dataset):
         # Resample image and DA slice to desired voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
         image = resample_image(image, self.img_spacing.tolist())
-        da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA index in 1mm spacing
+        da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA z-index
 
         ### Cropping ###
         # Get the centre of the head in the DA slice
@@ -228,7 +227,7 @@ class BaseDataset(Dataset):
         com  = ndimage.measurements.center_of_mass(slice)
         y, x = int(com[0]) - 25, int(com[1])
         crop_centre = np.array([x, y, da_z])
-        crop_size   = self.img_size[::-1] # Reverse array to comply with sitk indexing
+        crop_size   = self.img_size
 
         # Crop to required size around this point
         _min = np.floor(crop_centre - crop_size / 2).astype(np.int64)
@@ -277,6 +276,8 @@ class UnpairedDataset(BaseDataset):
         index (int)
             The index of the image to take from domain X.
         """
+        # Get size of tensor in torch/np indexing
+        tensor_size = self.img_size[::-1]
 
         # Randomize index for images in Y domain to avoid pairs
         x_index = index
@@ -293,8 +294,8 @@ class UnpairedDataset(BaseDataset):
             X, Y = self.transform((X, Y)) # Apply the same transform to both images
 
         if self.dim == 2 : # Use the channels as third dimension
-            X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
-            Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+            X = X.reshape(tensor_size[0], tensor_size[1], tensor_size[2])
+            Y = Y.reshape(tensor_size[0], tensor_size[1], tensor_size[2])
 
         return X, Y
 
@@ -317,6 +318,9 @@ class PairedDataset(BaseDataset):
         index (int)
             The index of the image in both domains.
         """
+        # Get size of tensor in torch/np indexing
+        tensor_size = self.img_size[::-1]
+
         x_patient_id = self.x_ids[index]
         y_patient_id = self.y_ids[index]
 
@@ -329,7 +333,7 @@ class PairedDataset(BaseDataset):
             X, Y = self.transform((X, Y))
 
         if self.dim == 2 : # Use the channels as third dimension
-            X = X.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
-            Y = Y.reshape(self.img_size[0], self.img_size[1], self.img_size[2])
+            X = X.reshape(tensor_size[0], tensor_size[1], tensor_size[2])
+            Y = Y.reshape(tensor_size[0], tensor_size[1], tensor_size[2])
 
         return X, Y
