@@ -140,6 +140,7 @@ class BaseDataset(Dataset):
         self.da_size_col = da_size_col
         self.da_slice_col = da_slice_col
         self.first_cache = False
+        self.full_df = pd.concat([self.X_df, self.Y_df])
 
         # Get the number of images in each domain
         self.x_size, self.y_size = len(X_df), len(Y_df)
@@ -189,7 +190,6 @@ class BaseDataset(Dataset):
 
     def _prepare_data(self) :
         """Preprocess and cache the dataset."""
-        self.full_df = pd.concat([self.X_df, self.Y_df])
         tasks = [patient_id for patient_id in self.full_df.index.values]
 
         print(f"Using {self.num_workers} CPUs to preprocess {len(tasks)} images.")

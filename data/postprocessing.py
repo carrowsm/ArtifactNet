@@ -18,6 +18,7 @@ class PostProcessor :
     def __init__(self,
                  input_dir: str,
                  output_dir: str,
+                 input_spacing: Sequence = [1.0, 1.0, 1.0],
                  output_spacing: Union[Sequence, str] = "orig",
                  input_file_type: str = "dicom",
                  output_file_type: str = "nrrd"):
@@ -29,6 +30,8 @@ class PostProcessor :
             should be contained in a subdirectory named with the patient's ID.
         output_dir (str)
             The directory in which to save the generated images.
+        input_spacing (list)
+            The voxel spacing of the torch tensor input to the postprocessor in mm.
         output_spacing (Sequence, str)
             The spacing of the output SITK file. Expected to be [x, y, z]. If
             'orig', the original spacing will be used.
@@ -39,6 +42,7 @@ class PostProcessor :
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.input_spacing = input_spacing
         self.output_spacing = output_spacing
         self.input_file_type = input_file_type
         self.output_file_type = output_file_type
@@ -88,6 +92,7 @@ class PostProcessor :
 
         # Convert the tensor image to SITK (with 1mm voxel spacing)
         sub_img = sitk.GetImageFromArray(model_output.numpy())
+        sub_img.SetSpacing(self.input_spacing)
 
         # Load original (uncorrected) image
         orig_path = os.path.join(self.input_dir, f"{patient_id}{self.input_suffix}")
