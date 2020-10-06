@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -t 1-00:00:00
-#SBATCH --mem=100G
+#SBATCH --mem=32G
 #SBATCH -J ArtifactNet
-#SBATCH -c 33
+#SBATCH -c 6
 #SBATCH -N 1
 #SBATCH --account=radiomics_gpu
 #SBATCH --partition=gpu_radiomics
@@ -31,9 +31,9 @@ cache_path="/cluster/projects/radiomics/Temp/colin/cyclegan_data/2-1-1mm_nrrd/"
 ### EDIT BELOW ###
 # Hyperparameters for training the model
 learn_rate=0.0002                       # Initial rate for the trainer
-batch_size=10                           # Batch size for trainer
+batch_size=5                            # Batch size for trainer
 num_gpus=1                              # Number of GPUs to use for training
-num_cpus=32                             # Number of workers for dataloaders
+num_cpus=6                             # Number of workers for dataloaders
 num_filters=32                          # Number of input filters for the model
 ### ---------- ###
 
@@ -48,7 +48,7 @@ python $path \
 --n_gpus $num_gpus \
 --n_cpus $num_cpus \
 --n_filters $num_filters \
---image_size 8 256 256 \
+--image_size 16 256 256 \
 --img_domain_x 2 1 \
 --img_domain_y 0 \
 --cnn_layers 3
