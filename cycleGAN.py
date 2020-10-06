@@ -229,7 +229,7 @@ class GAN(pl.LightningModule) :
     @pl.data_loader
     def val_dataloader(self) :
         data_loader = DataLoader(self.val_dataset,
-                                 batch_size=1,
+                                 batch_size=self.hparams.batch_size,
                                  shuffle=False,
                                  num_workers=self.hparams.n_cpus - 1,
                                  drop_last=True,
