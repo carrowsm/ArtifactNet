@@ -61,6 +61,12 @@ def load_image_data_frame(path, img_X: Sequence[str], img_Y: Sequence[str],
 
     return x_df_trg, x_df_val, y_df_trg, y_df_val
 
+class class1(object):
+    """docstring for class1."""
+
+    def __init__(self, arg):
+        super(class1, self).__init__()
+        self.arg = arg
 
 
 class BaseDataset(Dataset):
@@ -82,7 +88,8 @@ class BaseDataset(Dataset):
                  num_workers: int = 1,
                  patient_id_col: str = "patient_id",
                  da_size_col: str = "has_artifact",
-                 da_slice_col: str = "a_slice") :
+                 da_slice_col: str = "a_slice",
+                 dataset_type=None) :
         """ Initialize the class.
 
         Get the full paths to all images. Load and preprocess if the files if
@@ -104,9 +111,9 @@ class BaseDataset(Dataset):
             The file type to load. Can be either "npy" or "nrrd" or "DICOM".
         image_size : int, list, None
             The size of the image to use (same for both domains X and Y).
-            - If None, use the entire image (centre_pix will be ignored).
+            - If None, use the entire image (center_pix will be ignored).
             - If int=a, each image will be cropped to form a cube of size
-              a^3 aroud centre_pix.
+              a^3 aroud center_pix.
             - If list, it should have len=3 and represent the (z, y, x) size to
               crop all images to.
         image_spacing : List
@@ -140,6 +147,7 @@ class BaseDataset(Dataset):
         self.da_size_col = da_size_col
         self.da_slice_col = da_slice_col
         self.first_cache = False
+        self.dataset_type = dataset_type
         self.full_df = pd.concat([self.X_df, self.Y_df])
 
         # Get the number of images in each domain
@@ -190,24 +198,53 @@ class BaseDataset(Dataset):
 
     def _prepare_data(self) :
         """Preprocess and cache the dataset."""
-        tasks = [patient_id for patient_id in self.full_df.index.values]
+        if self.dataset_type == "unpaired" :
+            tasks = [patient_id for patient_id in self.full_df.index.values]
 
-        print(f"Using {self.num_workers} CPUs to preprocess {len(tasks)} images.")
-        print("This may take a moment...")
-        if self.num_workers > 1 :
-            with Pool(processes=self.num_workers) as p:
-                center_coords = p.map(self._preprocess_image, tasks)
-        else :
-            center_coords = [self._preprocess_image(id) for id in tasks]
+            print(f"Using {self.num_workers} CPUs to preprocess {len(tasks)} images.")
+            print("This may take a moment...")
+            if self.num_workers > 1 :
+                with Pool(processes=self.num_workers) as p:
+                    center_coords = p.map(self._preprocess_image, tasks)
+            else :
+                center_coords = [self._preprocess_image(id) for id in tasks]
 
-        # Keep track of subvolume centre
-        coords_array = np.array(center_coords)
-        self.full_df["img_center_x"] = coords_array[:, 0]
-        self.full_df["img_center_y"] = coords_array[:, 1]
-        self.full_df["img_center_z"] = coords_array[:, 2]
+            # Keep track of subvolume center
+            coords_array = np.array(center_coords)
+            self.full_df["img_center_x"] = coords_array[:, 0]
+            self.full_df["img_center_y"] = coords_array[:, 1]
+            self.full_df["img_center_z"] = coords_array[:, 2]
+
+        if self.dataset_type == "paired" :
+            npairs, ncpus = len(self.X_df), self.num_workers
+            print(f"Using {ncpus} CPUs to preprocess {npairs} image pairs.")
+            print("This may take a moment...")
+
+            tasks = np.array([self.X_df.index.values, self.Y_df.index.values]).reshape(npairs, 2)
+            if self.num_workers > 1 :
+                with Pool(processes=ncpus) as p:
+                    center_coords = p.map(self._preprocess_pair, tasks)
+            else :
+                center_coords = [self._preprocess_pair(id) for id in tasks]
+            print(center_coords)
 
 
-    def _preprocess_image(self, patient_id: str) :
+    def _preprocess_pair(self, ids) :
+        """ A function to create a pair of images preprocessed in exactly
+        the same way.
+        """
+        x_patient_id, y_patient_id = ids
+        # Preprocess image x and get physical coords of img center
+        x_coords = self._preprocess_image(x_patient_id)
+
+        # Load image y and crop it around the same place as image x
+        y_coords = self._preprocess_image(y_patient_id, center_coords=x_coords)
+
+        return x_coords, y_coords
+
+
+
+    def _preprocess_image(self, patient_id: str, center_coords=None) :
         """Preprocess and cache a single image."""
         # Load image and DA index in original voxel spacing
         path = os.path.join(self.img_dir, f"{patient_id}{self.img_suffix}")
@@ -217,28 +254,32 @@ class BaseDataset(Dataset):
         # Resample image and DA slice to desired voxel spacing
         da_coords = image.TransformIndexToPhysicalPoint([150, 150, da_idx])
         image = resample_image(image, self.img_spacing.tolist())
-        da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA z-index
 
         ### Cropping ###
-        # Get the centre of the head in the DA slice
-        slice = sitk.GetArrayFromImage(image[:, :, da_z])
-        t = threshold_otsu(np.clip(slice, -1000, 1000))
-        slice = np.array(slice > t, dtype=int)
-        com  = ndimage.measurements.center_of_mass(slice)
-        y, x = int(com[0]) - 25, int(com[1])
-        crop_centre = np.array([x, y, da_z])
+        if center_coords is None :
+            da_z = image.TransformPhysicalPointToIndex(da_coords)[2] # DA z-index
+            # Get the center of the head in the DA slice
+            slice = sitk.GetArrayFromImage(image[:, :, da_z])
+            t = threshold_otsu(np.clip(slice, -1000, 1000))
+            slice = np.array(slice > t, dtype=int)
+            com  = ndimage.measurements.center_of_mass(slice)
+            y, x = int(com[0]) - 25, int(com[1])
+        else :
+            x, y, da_z = image.TransformPhysicalPointToIndex(center_coords)
+
         crop_size   = self.img_size
+        crop_center = np.array([x, y, da_z])
 
         # Crop to required size around this point
-        _min = np.floor(crop_centre - crop_size / 2).astype(np.int64)
-        _max = np.floor(crop_centre + crop_size / 2).astype(np.int64)
+        _min = np.floor(crop_center - crop_size / 2).astype(np.int64)
+        _max = np.floor(crop_center + crop_size / 2).astype(np.int64)
         subvol = image[_min[0] : _max[0], _min[1] : _max[1], _min[2] : _max[2]]
         ### --------- ###
 
         # Save the image
         sitk.WriteImage(subvol, os.path.join(self.cache_dir, f"{patient_id}.nrrd"))
 
-        # Save the location of the centre of the image
+        # Save the location of the center of the image
         coords = image.TransformIndexToPhysicalPoint((x, y, da_z))
         return float(coords[0]), float(coords[1]), float(coords[2])
 
@@ -266,6 +307,10 @@ class UnpairedDataset(BaseDataset):
     Since this is a subclass of BaseDataset, the images will be cached if needed
     and read from the cache during training.
     """
+    def __init__(self, *args, **kwargs) :
+        super(UnpairedDataset, self).__init__(*args, **kwargs, dataset_type="unpaired")
+
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor] :
         """ Get a the image at index from domain X and get an accompanying
         random image from domain Y. Assume the images are preprocessed (sized)
@@ -303,10 +348,11 @@ class UnpairedDataset(BaseDataset):
 class PairedDataset(BaseDataset):
     """Dataloader for a PairedDataset."""
     def __init__(self, *args, **kwargs) :
-        super().__init__(*args, **kwargs)
+        super(PairedDataset, self).__init__(*args, **kwargs, dataset_type="paired")
         # Check that the two dataframes are the same length
         if self.x_size != self.y_size :
             raise ValueError("Paired datasets must have the same size.")
+
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor] :
         """ Get a the image at index from domain X and get an accompanying
