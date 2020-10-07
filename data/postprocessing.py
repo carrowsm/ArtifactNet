@@ -33,7 +33,7 @@ class PostProcessor :
         input_spacing (list)
             The voxel spacing of the torch tensor input to the postprocessor in mm.
         output_spacing (Sequence, str)
-            The spacing of the output SITK file. Expected to be [x, y, z]. If
+            The spacing of the output SITK file. Expected to be [z, y, x]. If
             'orig', the original spacing will be used.
         input_file_type (str)
             The file type of the original images. Can be 'dicom' or 'nrrd'.
@@ -42,8 +42,8 @@ class PostProcessor :
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
-        self.input_spacing = input_spacing
-        self.output_spacing = output_spacing
+        self.input_spacing = input_spacing[::-1]   # Reverse for SITK indexing
+        self.output_spacing =  output_spacing
         self.input_file_type = input_file_type
         self.output_file_type = output_file_type
 
@@ -117,7 +117,7 @@ class PostProcessor :
 
         # Resample the resulting image to the required spacing
         if self.output_spacing != 'orig' :
-            full_img = resample_image(full_img, self.output_spacing)
+            full_img = resample_image(full_img, self.output_spacing[::-1])
 
         # Save the image
         file_name = f"{patient_id}.{self.output_file_type}"

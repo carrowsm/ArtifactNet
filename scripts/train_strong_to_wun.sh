@@ -31,9 +31,9 @@ cache_path="/cluster/projects/radiomics/Temp/colin/cyclegan_data/2-1-1mm_nrrd/"
 ### EDIT BELOW ###
 # Hyperparameters for training the model
 learn_rate=0.0002                        # Initial rate for the trainer
-batch_size=5                            # Batch size for trainer
+batch_size=3                             # Batch size for trainer
 num_gpus=1                               # Number of GPUs to use for training
-num_cpus=6                              # Number of workers for dataloaders
+num_cpus=32                              # Number of workers for dataloaders
 num_filters=32                           # Number of input filters for the model
 ### ---------- ###
 
@@ -51,5 +51,5 @@ python $path \
 --image_size 16 256 256 \
 --img_domain_x 2 \
 --img_domain_y 1 0 \
---cnn_layers 3
+--cnn_layers 4
 echo 'Python script finished.'
